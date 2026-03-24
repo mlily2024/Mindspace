@@ -22,7 +22,7 @@
   --surface-hover: #FFF0E8;        /* Hover state */
   --border: #E8DDD6;               /* Warm border */
   --text-primary: #4A4045;         /* Warm dark gray */
-  --text-secondary: #8A7A7F;       /* Warm medium gray */
+  --text-secondary: #6E6269;       /* Warm medium gray — WCAG AA 4.5:1 on #FFFBF8 */
   --text-light: #FFFFFF;
 
   /* Typography - friendlier fonts */
@@ -497,7 +497,7 @@ body.font-xlarge { font-size: 1.25rem; }
 .alert-warning {
   background-color: #FFF8E8;
   border-color: var(--warning-color);
-  color: #6B5A2D;
+  color: #5C4A1E;  /* Darkened for WCAG AA 4.5:1 on #FFF8E8 */
 }
 
 .alert-danger,

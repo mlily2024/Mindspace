@@ -29,10 +29,14 @@ api.interceptors.response.use(
   (response) => response.data,
   (error) => {
     if (error.response?.status === 401) {
+      // Only redirect if we had a token (expired/invalid) — not on login attempts
+      const hadToken = !!localStorage.getItem('token');
       localStorage.removeItem('token');
-      window.location.href = '/login';
+      if (hadToken && !error.config?.url?.includes('/auth/login')) {
+        window.location.href = '/login';
+      }
     }
-    return Promise.reject(error.response?.data || error.message);
+    return Promise.reject(error.response?.data || { message: error.message });
   }
 );
 

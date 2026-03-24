@@ -1,7 +1,10 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { authAPI } from '../services/api';
 
 const AuthContext = createContext(null);
+
+// Inactivity timeout: 30 minutes
+const INACTIVITY_TIMEOUT_MS = 30 * 60 * 1000;
 
 export const useAuth = () => {
   const context = useContext(AuthContext);
@@ -15,10 +18,42 @@ export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const inactivityTimer = useRef(null);
 
   useEffect(() => {
     checkAuth();
   }, []);
+
+  // Inactivity timeout — auto-logout after 30 minutes of no interaction
+  const resetInactivityTimer = useCallback(() => {
+    if (inactivityTimer.current) {
+      clearTimeout(inactivityTimer.current);
+    }
+    inactivityTimer.current = setTimeout(() => {
+      // Only logout if currently authenticated
+      const token = localStorage.getItem('token');
+      if (token) {
+        localStorage.removeItem('token');
+        setUser(null);
+        window.location.href = '/login';
+      }
+    }, INACTIVITY_TIMEOUT_MS);
+  }, []);
+
+  useEffect(() => {
+    if (!user) return;
+
+    const events = ['mousedown', 'keydown', 'scroll', 'touchstart'];
+    const handler = () => resetInactivityTimer();
+
+    events.forEach(event => window.addEventListener(event, handler, { passive: true }));
+    resetInactivityTimer(); // Start the timer
+
+    return () => {
+      events.forEach(event => window.removeEventListener(event, handler));
+      if (inactivityTimer.current) clearTimeout(inactivityTimer.current);
+    };
+  }, [user, resetInactivityTimer]);
 
   const checkAuth = async () => {
     const token = localStorage.getItem('token');
@@ -85,6 +120,7 @@ export const AuthProvider = ({ children }) => {
   const logout = () => {
     localStorage.removeItem('token');
     setUser(null);
+    if (inactivityTimer.current) clearTimeout(inactivityTimer.current);
   };
 
   const updateProfile = async (data) => {

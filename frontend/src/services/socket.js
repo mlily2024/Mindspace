@@ -13,7 +13,6 @@ const MAX_RECONNECT_ATTEMPTS = 5;
  */
 export const initializeSocket = (token) => {
   if (socket?.connected) {
-    console.log('Socket already connected');
     return socket;
   }
 
@@ -30,16 +29,14 @@ export const initializeSocket = (token) => {
 
   // Connection event handlers
   socket.on('connect', () => {
-    console.log('Socket connected:', socket.id);
     reconnectAttempts = 0;
   });
 
-  socket.on('connected', (data) => {
-    console.log('Server confirmed connection:', data);
+  socket.on('connected', () => {
+    // Server confirmed connection
   });
 
   socket.on('disconnect', (reason) => {
-    console.log('Socket disconnected:', reason);
     if (reason === 'io server disconnect') {
       // Server disconnected, try to reconnect
       socket.connect();
@@ -60,8 +57,8 @@ export const initializeSocket = (token) => {
   });
 
   // Heartbeat handling
-  socket.on('pong', (data) => {
-    console.log('Heartbeat received:', data.timestamp);
+  socket.on('pong', () => {
+    // Heartbeat received
   });
 
   return socket;
@@ -86,7 +83,6 @@ export const disconnectSocket = () => {
   if (socket) {
     socket.disconnect();
     socket = null;
-    console.log('Socket disconnected manually');
   }
 };
 
@@ -107,7 +103,6 @@ export const reconnectSocket = () => {
  */
 export const emitEvent = (event, data) => {
   if (!socket?.connected) {
-    console.warn('Socket not connected, cannot emit:', event);
     return false;
   }
   socket.emit(event, data);

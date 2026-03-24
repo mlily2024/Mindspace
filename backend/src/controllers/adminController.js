@@ -14,6 +14,9 @@ const bcrypt = require('bcryptjs');
  */
 const getAllUsers = async (req, res, next) => {
   try {
+    const limit = Math.min(Math.max(parseInt(req.query.limit) || 50, 1), 200);
+    const offset = Math.max(parseInt(req.query.offset) || 0, 0);
+
     const query = `
       SELECT
         u.user_id, u.email, u.username, u.is_anonymous, u.user_group,
@@ -21,15 +24,23 @@ const getAllUsers = async (req, res, next) => {
         (SELECT COUNT(*) FROM mood_entries WHERE user_id = u.user_id) as mood_entries_count
       FROM users u
       ORDER BY u.created_at DESC
+      LIMIT $1 OFFSET $2
     `;
 
-    const result = await db.query(query);
+    const countQuery = `SELECT COUNT(*) FROM users`;
+
+    const [result, countResult] = await Promise.all([
+      db.query(query, [limit, offset]),
+      db.query(countQuery)
+    ]);
 
     res.json({
       success: true,
       data: {
         users: result.rows,
-        total: result.rows.length
+        total: parseInt(countResult.rows[0].count),
+        limit,
+        offset
       }
     });
   } catch (error) {
@@ -43,7 +54,8 @@ const getAllUsers = async (req, res, next) => {
  */
 const getAllMoodEntries = async (req, res, next) => {
   try {
-    const { limit = 100, offset = 0 } = req.query;
+    const limit = Math.min(Math.max(parseInt(req.query.limit) || 100, 1), 500);
+    const offset = Math.max(parseInt(req.query.offset) || 0, 0);
 
     const query = `
       SELECT
@@ -182,7 +194,8 @@ const manageUser = async (req, res, next) => {
  */
 const getSystemLogs = async (req, res, next) => {
   try {
-    const { type = 'combined', lines = 100 } = req.query;
+    const type = req.query.type === 'error' ? 'error' : 'combined';
+    const lines = Math.min(Math.max(parseInt(req.query.lines) || 100, 1), 1000);
 
     const logDir = path.join(__dirname, '../../logs');
     const logFile = type === 'error' ? 'error.log' : 'combined.log';

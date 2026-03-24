@@ -6,6 +6,26 @@ const logger = require('../config/logger');
  */
 
 /**
+ * Simple per-socket rate limiter
+ * Returns true if the event should be allowed, false if rate-limited
+ */
+const createRateLimiter = (maxEvents, windowMs) => {
+  const events = [];
+  return () => {
+    const now = Date.now();
+    // Remove events outside the window
+    while (events.length > 0 && events[0] <= now - windowMs) {
+      events.shift();
+    }
+    if (events.length >= maxEvents) {
+      return false; // rate limited
+    }
+    events.push(now);
+    return true;
+  };
+};
+
+/**
  * Register all socket handlers for a connected socket
  * @param {Object} io - Socket.io server instance
  * @param {Object} socket - Connected socket instance
@@ -29,8 +49,16 @@ const registerSocketHandlers = (io, socket, services = {}) => {
 const registerPeerChatHandlers = (io, socket, services) => {
   const userId = socket.userId;
 
+  // Rate limiters: 30 events/min for actions, 10/sec for typing
+  const actionLimiter = createRateLimiter(30, 60000);
+  const typingLimiter = createRateLimiter(10, 1000);
+
   // Join a peer support group room
   socket.on('peer:join_group', async (data) => {
+    if (!actionLimiter()) {
+      socket.emit('peer:error', { message: 'Too many requests, please slow down' });
+      return;
+    }
     try {
       const { groupId } = data;
 
@@ -83,8 +111,9 @@ const registerPeerChatHandlers = (io, socket, services) => {
     }
   });
 
-  // Typing indicator
+  // Typing indicator (rate-limited to prevent spam)
   socket.on('peer:typing', async (data) => {
+    if (!typingLimiter()) return; // silently drop excess typing events
     try {
       const { groupId, nickname } = data;
 

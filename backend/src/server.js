@@ -95,29 +95,26 @@ app.use('/api/', limiter);
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
-// Request logging middleware
+// Request ID and logging middleware
+const { v4: uuidv4 } = require('uuid');
 app.use((req, res, next) => {
+  req.id = uuidv4();
+  res.setHeader('X-Request-ID', req.id);
   logger.info('Incoming request', {
+    requestId: req.id,
     method: req.method,
     url: req.url,
-    ip: req.ip,
-    userAgent: req.get('user-agent')
+    ip: req.ip
   });
   next();
 });
 
-// Health check endpoint
+// Health check endpoint (no sensitive info exposed)
 app.get('/health', (req, res) => {
-  const { getActiveConnectionCount, getOnlineUserCount } = require('./config/socketio');
   res.json({
     success: true,
     message: 'Mental Health Tracker API is running',
-    timestamp: new Date().toISOString(),
-    environment: process.env.NODE_ENV,
-    websocket: {
-      activeConnections: getActiveConnectionCount(),
-      onlineUsers: getOnlineUserCount()
-    }
+    timestamp: new Date().toISOString()
   });
 });
 

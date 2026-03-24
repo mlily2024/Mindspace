@@ -3,7 +3,9 @@ const logger = require('../config/logger');
 
 // Admin password MUST be set in environment - no defaults for security
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
-const ADMIN_JWT_SECRET = process.env.JWT_SECRET + '_admin';
+const ADMIN_JWT_SECRET = process.env.ADMIN_JWT_SECRET || (process.env.JWT_SECRET
+  ? require('crypto').createHash('sha256').update(process.env.JWT_SECRET + '_admin_secret').digest('hex')
+  : undefined);
 
 // Validate admin password is configured on startup
 if (!ADMIN_PASSWORD || ADMIN_PASSWORD.length < 12) {
@@ -47,7 +49,6 @@ const adminLogin = (req, res) => {
   }
 
   // Password authentication - use timing-safe comparison to prevent timing attacks
-  const crypto = require('crypto');
   const passwordBuffer = Buffer.from(password);
   const adminPasswordBuffer = Buffer.from(ADMIN_PASSWORD);
 

@@ -4,8 +4,9 @@ const logger = require('../config/logger');
  * Global error handler middleware
  */
 const errorHandler = (err, req, res, next) => {
-  // Log error
+  // Log error with request ID for correlation
   logger.error('Error occurred', {
+    requestId: req.id,
     error: err.message,
     stack: err.stack,
     url: req.url,
@@ -17,14 +18,14 @@ const errorHandler = (err, req, res, next) => {
   // Default error status
   const statusCode = err.statusCode || 500;
   const message = err.message || 'Internal server error';
+  const isProduction = process.env.NODE_ENV === 'production';
 
-  // Send error response
+  // Send error response — never expose stack traces or internal details in production
   res.status(statusCode).json({
     success: false,
-    message: process.env.NODE_ENV === 'production'
-      ? 'An error occurred'
-      : message,
-    ...(process.env.NODE_ENV !== 'production' && { stack: err.stack })
+    message: isProduction ? 'An error occurred' : message,
+    requestId: req.id,
+    ...(!isProduction && { stack: err.stack })
   });
 };
 

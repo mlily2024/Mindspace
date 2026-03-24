@@ -13,8 +13,19 @@ const logger = require('../config/logger');
 const checkForIntervention = async (req, res, next) => {
   try {
     const userId = req.user.userId;
+    let moodEntry = null;
+    if (req.query.moodEntry) {
+      try {
+        moodEntry = JSON.parse(req.query.moodEntry);
+        if (typeof moodEntry !== 'object' || moodEntry === null || Array.isArray(moodEntry)) {
+          return res.status(400).json({ success: false, message: 'moodEntry must be a JSON object' });
+        }
+      } catch (e) {
+        return res.status(400).json({ success: false, message: 'Invalid moodEntry JSON format' });
+      }
+    }
     const context = {
-      moodEntry: req.query.moodEntry ? JSON.parse(req.query.moodEntry) : null,
+      moodEntry,
       trigger: req.query.trigger || 'manual',
       override: req.query.override === 'true'
     };
@@ -196,7 +207,7 @@ const skipIntervention = async (req, res, next) => {
 const getHistory = async (req, res, next) => {
   try {
     const userId = req.user.userId;
-    const days = parseInt(req.query.days) || 30;
+    const days = Math.min(Math.max(parseInt(req.query.days) || 30, 1), 365);
 
     const history = await MicroInterventionService.getInterventionHistory(userId, days);
 

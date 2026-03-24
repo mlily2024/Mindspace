@@ -14,6 +14,10 @@ const validate = require('../middleware/validation');
 router.use(authenticateToken);
 
 // Validation rules
+const historyValidation = [
+  query('days').optional().isInt({ min: 1, max: 365 }).withMessage('Days must be between 1-365')
+];
+
 const completeValidation = [
   body('rating').optional().isInt({ min: 1, max: 5 }).withMessage('Rating must be between 1-5')
 ];
@@ -36,7 +40,7 @@ router.get('/all', interventionController.getAllInterventions);
  * Get user's intervention history
  * Query params: days (default 30)
  */
-router.get('/history', interventionController.getHistory);
+router.get('/history', historyValidation, validate, interventionController.getHistory);
 
 /**
  * GET /api/interventions/stats

@@ -24,16 +24,69 @@ api.interceptors.request.use(
   }
 );
 
-// Response interceptor for error handling
+// Track whether a token refresh is already in progress
+let isRefreshing = false;
+let refreshSubscribers = [];
+
+const onRefreshed = (newToken) => {
+  refreshSubscribers.forEach(cb => cb(newToken));
+  refreshSubscribers = [];
+};
+
+const addRefreshSubscriber = (cb) => {
+  refreshSubscribers.push(cb);
+};
+
+// Response interceptor with silent token refresh on 401
 api.interceptors.response.use(
   (response) => response.data,
-  (error) => {
-    if (error.response?.status === 401) {
-      // Only redirect if we had a token (expired/invalid) — not on login attempts
+  async (error) => {
+    const originalRequest = error.config;
+
+    if (error.response?.status === 401 && !originalRequest._retry) {
+      // Skip refresh for login/register/refresh endpoints
+      const skipUrls = ['/auth/login', '/auth/register', '/auth/refresh'];
+      if (skipUrls.some(url => originalRequest.url?.includes(url))) {
+        return Promise.reject(error.response?.data || { message: error.message });
+      }
+
       const hadToken = !!localStorage.getItem('token');
-      localStorage.removeItem('token');
-      if (hadToken && !error.config?.url?.includes('/auth/login')) {
+      if (!hadToken) {
+        return Promise.reject(error.response?.data || { message: error.message });
+      }
+
+      if (isRefreshing) {
+        // Queue this request until the refresh completes
+        return new Promise((resolve) => {
+          addRefreshSubscriber((newToken) => {
+            originalRequest.headers.Authorization = `Bearer ${newToken}`;
+            resolve(api(originalRequest));
+          });
+        });
+      }
+
+      originalRequest._retry = true;
+      isRefreshing = true;
+
+      try {
+        // Attempt silent refresh — the backend accepts expired tokens for refresh
+        const response = await axios.post(`${API_BASE_URL}/auth/refresh`, {}, {
+          headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+        });
+        const newToken = response.data?.data?.token;
+        if (newToken) {
+          localStorage.setItem('token', newToken);
+          onRefreshed(newToken);
+          originalRequest.headers.Authorization = `Bearer ${newToken}`;
+          return api(originalRequest);
+        }
+      } catch (refreshError) {
+        // Refresh failed — force logout
+        localStorage.removeItem('token');
         window.location.href = '/login';
+        return Promise.reject(refreshError);
+      } finally {
+        isRefreshing = false;
       }
     }
     return Promise.reject(error.response?.data || { message: error.message });

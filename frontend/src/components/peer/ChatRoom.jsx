@@ -19,6 +19,7 @@ const ChatRoom = ({ group, membership, onBack }) => {
   const [onlineCount, setOnlineCount] = useState(0);
   const messagesEndRef = useRef(null);
   const typingTimeoutRef = useRef(null);
+  const typingDebounceRef = useRef(null);
   const inputRef = useRef(null);
 
   // Scroll to bottom of messages
@@ -103,20 +104,25 @@ const ChatRoom = ({ group, membership, onBack }) => {
     };
   }, [isConnected, group.id, membership, scrollToBottom]);
 
-  // Handle typing indicator
+  // Handle typing indicator (debounced to prevent socket spam)
   const handleInputChange = (e) => {
     setNewMessage(e.target.value);
 
     if (membership?.anonymous_nickname) {
-      // Clear existing timeout
+      // Clear existing stop-typing timeout
       if (typingTimeoutRef.current) {
         clearTimeout(typingTimeoutRef.current);
       }
 
-      // Send typing indicator
-      sendTypingIndicator(group.id, membership.anonymous_nickname);
+      // Debounce: only send typing indicator at most once per 300ms
+      if (!typingDebounceRef.current) {
+        sendTypingIndicator(group.id, membership.anonymous_nickname);
+        typingDebounceRef.current = setTimeout(() => {
+          typingDebounceRef.current = null;
+        }, 300);
+      }
 
-      // Set timeout to stop typing
+      // Set timeout to send stop typing after 2s of inactivity
       typingTimeoutRef.current = setTimeout(() => {
         sendStopTyping(group.id, membership.anonymous_nickname);
       }, 2000);

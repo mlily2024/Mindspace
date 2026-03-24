@@ -9,6 +9,19 @@ const bcrypt = require('bcryptjs');
  * Admin Controller - Developer Panel Features
  */
 
+const logAdminAction = async (req, action, resourceType, resourceId, status = 'success') => {
+  try {
+    await db.query(
+      `INSERT INTO audit_log (log_id, user_id, action, resource_type, resource_id, ip_address, user_agent, status)
+       VALUES (uuid_generate_v4(), $1, $2, $3, $4, $5, $6, $7)`,
+      [req.admin?.userId || null, action, resourceType, resourceId || null, req.ip, req.get('user-agent'), status]
+    );
+  } catch (err) {
+    // Non-fatal: don't break the request if audit logging fails
+    logger.error('Audit log failed', { error: err.message, action });
+  }
+};
+
 /**
  * Get all users
  */
@@ -33,6 +46,8 @@ const getAllUsers = async (req, res, next) => {
       db.query(query, [limit, offset]),
       db.query(countQuery)
     ]);
+
+    await logAdminAction(req, 'view_all_users', 'user', null);
 
     res.json({
       success: true,
@@ -123,6 +138,8 @@ const getDatabaseStats = async (req, res, next) => {
       db.query(userGroupQuery)
     ]);
 
+    await logAdminAction(req, 'view_database_stats', 'stats', null);
+
     res.json({
       success: true,
       data: {
@@ -177,6 +194,7 @@ const manageUser = async (req, res, next) => {
     }
 
     logger.info('Admin: User status changed', { userId, action, newStatus: statusMap[action] });
+    await logAdminAction(req, 'user_status_change', 'user', userId);
 
     res.json({
       success: true,
@@ -350,6 +368,7 @@ const generateTestData = async (req, res, next) => {
       usersCreated: createdUsers.length,
       entriesCreated: createdEntries.length
     });
+    await logAdminAction(req, 'generate_test_data', 'test_data', null);
 
     res.json({
       success: true,
@@ -380,6 +399,7 @@ const deleteTestData = async (req, res, next) => {
     const result = await db.query(deleteQuery);
 
     logger.info('Admin: Test data deleted', { usersDeleted: result.rows.length });
+    await logAdminAction(req, 'delete_test_data', 'test_data', null);
 
     res.json({
       success: true,

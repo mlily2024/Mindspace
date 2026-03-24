@@ -290,9 +290,61 @@ const permanentDeleteAccount = async (req, res, next) => {
   }
 };
 
+/**
+ * Refresh JWT token (rotation)
+ * Accepts an expired (or valid) token and issues a new one,
+ * as long as the token signature is authentic and payload is well-formed.
+ */
+const refreshToken = async (req, res, next) => {
+  try {
+    const authHeader = req.headers['authorization'];
+    const token = authHeader && authHeader.split(' ')[1];
+
+    if (!token) {
+      return res.status(401).json({
+        success: false,
+        message: 'Access token required'
+      });
+    }
+
+    let decoded;
+    try {
+      decoded = jwt.verify(token, process.env.JWT_SECRET, { ignoreExpiration: true });
+    } catch (err) {
+      logger.warn('Token refresh failed - invalid token', { ip: req.ip });
+      return res.status(401).json({
+        success: false,
+        message: 'Invalid token'
+      });
+    }
+
+    if (!decoded.userId || !decoded.email) {
+      return res.status(401).json({
+        success: false,
+        message: 'Invalid token payload'
+      });
+    }
+
+    // Issue a new token
+    const newToken = generateToken(decoded.userId, decoded.email);
+
+    logger.info('Token refreshed', { userId: decoded.userId });
+
+    res.json({
+      success: true,
+      message: 'Token refreshed successfully',
+      data: { token: newToken }
+    });
+  } catch (error) {
+    logger.error('Token refresh error', { error: error.message });
+    next(error);
+  }
+};
+
 module.exports = {
   register,
   login,
+  refreshToken,
   getProfile,
   updateProfile,
   updatePreferences,

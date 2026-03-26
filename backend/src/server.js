@@ -28,6 +28,16 @@ const interventionRoutes = require('./routes/interventionRoutes');
 // Wearable Integration routes
 const wearableRoutes = require('./routes/wearableRoutes');
 
+// Enhancement routes (Enhancements 1-9)
+const quickCheckInRoutes = require('./routes/quickCheckInRoutes');
+const emaRoutes = require('./routes/emaRoutes');
+const lunaRoutes = require('./routes/lunaRoutes');
+const predictionRoutes = require('./routes/predictionRoutes');
+const protocolRoutes = require('./routes/protocolRoutes');
+const assessmentRoutes = require('./routes/assessmentRoutes');
+const enhancedPeerRoutes = require('./routes/enhancedPeerRoutes');
+const clinicianReportRoutes = require('./routes/clinicianReportRoutes');
+
 // Initialize Express app
 const app = express();
 
@@ -133,6 +143,16 @@ app.use('/api/voice', voiceRoutes);
 app.use('/api/interventions', interventionRoutes);
 // Wearable Integration routes
 app.use('/api/wearables', wearableRoutes);
+
+// Enhancement routes (Enhancements 1-9)
+app.use('/api/quick-checkin', quickCheckInRoutes);
+app.use('/api/ema', emaRoutes);
+app.use('/api/luna', lunaRoutes);
+app.use('/api/predictions/v2', predictionRoutes);
+app.use('/api/protocols', protocolRoutes);
+app.use('/api/assessments', assessmentRoutes);
+app.use('/api/peer-support/enhanced', enhancedPeerRoutes);
+app.use('/api/clinician-reports', clinicianReportRoutes);
 
 // 404 handler
 app.use(notFound);

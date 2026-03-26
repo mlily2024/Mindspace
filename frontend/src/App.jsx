@@ -25,6 +25,14 @@ const AdminDashboard = lazy(() => import('./pages/AdminDashboard'));
 const WearableSettings = lazy(() => import('./pages/WearableSettings'));
 const Chatbot = lazy(() => import('./components/Chatbot'));
 
+// Enhancement pages (Enhancements 1-9)
+const Assessments = lazy(() => import('./pages/Assessments'));
+const Protocols = lazy(() => import('./pages/Protocols'));
+const Predictions = lazy(() => import('./pages/Predictions'));
+const ClinicianReport = lazy(() => import('./pages/ClinicianReport'));
+const EnhancedPeerSupport = lazy(() => import('./pages/EnhancedPeerSupport'));
+const LunaChat = lazy(() => import('./components/LunaChat'));
+
 // Loading fallback for lazy-loaded routes
 const PageLoader = () => (
   <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '100vh' }}>
@@ -66,7 +74,7 @@ const ProtectedRoute = ({ children }) => {
         {children}
       </ErrorBoundary>
       <Suspense fallback={null}>
-        <Chatbot />
+        <LunaChat />
       </Suspense>
     </>
   ) : (
@@ -130,6 +138,26 @@ const AppContent = () => {
           <Route
             path="/settings/wearables"
             element={<ProtectedRoute><WearableSettings /></ProtectedRoute>}
+          />
+          <Route
+            path="/assessments"
+            element={<ProtectedRoute><Assessments /></ProtectedRoute>}
+          />
+          <Route
+            path="/protocols"
+            element={<ProtectedRoute><Protocols /></ProtectedRoute>}
+          />
+          <Route
+            path="/predictions"
+            element={<ProtectedRoute><Predictions /></ProtectedRoute>}
+          />
+          <Route
+            path="/clinician-report"
+            element={<ProtectedRoute><ClinicianReport /></ProtectedRoute>}
+          />
+          <Route
+            path="/peer-support/enhanced"
+            element={<ProtectedRoute><EnhancedPeerSupport /></ProtectedRoute>}
           />
         </Routes>
       </Suspense>

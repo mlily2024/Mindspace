@@ -292,6 +292,92 @@ export const wearablesAPI = {
   getDashboard: () => api.get('/wearables/dashboard')
 };
 
+// ============================================
+// Enhancement APIs (Enhancements 1-9)
+// ============================================
+
+// Quick Check-In API (Enhancement 1)
+export const quickCheckInAPI = {
+  create: (data) => api.post('/quick-checkin', data)
+};
+
+// EMA API (Enhancement 2)
+export const emaAPI = {
+  getSchedule: () => api.get('/ema/schedule'),
+  updateSchedule: (settings) => api.put('/ema/schedule', settings),
+  generatePrompts: () => api.post('/ema/prompts/generate'),
+  getPendingPrompts: () => api.get('/ema/prompts/pending'),
+  respondToPrompt: (promptId, data) => api.post(`/ema/prompts/${promptId}/respond`, data),
+  getVariability: (date) => api.get('/ema/variability', { params: { date } })
+};
+
+// Luna 2.0 API (Enhancement 3)
+export const lunaAPI = {
+  sendMessage: (message, sessionId) => api.post('/luna/message', { message, sessionId }),
+  getJournal: (limit) => api.get('/luna/journal', { params: { limit } }),
+  getProfile: () => api.get('/luna/profile'),
+  updateProfile: (updates) => api.put('/luna/profile', updates),
+  getTechniques: () => api.get('/luna/techniques'),
+  suggestRefinements: (emotion) => api.get('/luna/refinements', { params: { emotion } }),
+  getContext: () => api.get('/luna/context')
+};
+
+// Voice Signature API (Enhancement 4)
+export const voiceSignatureAPI = {
+  recordSample: (features, moodScore) => api.post('/voice/sample', { features, moodScore }),
+  getBaseline: () => api.get('/voice/baseline'),
+  getHistory: (days) => api.get('/voice/history', { params: { days } }),
+  getCorrelation: () => api.get('/voice/correlation')
+};
+
+// Predictions V2 API (Enhancement 5)
+export const predictionsV2API = {
+  getPredictions: (days = 3) => api.get('/predictions/v2', { params: { days } }),
+  trainModel: () => api.post('/predictions/v2/train'),
+  getModelInfo: () => api.get('/predictions/v2/model'),
+  getAccuracy: () => api.get('/predictions/v2/accuracy')
+};
+
+// Protocols API (Enhancement 6)
+export const protocolsAPI = {
+  getAll: () => api.get('/protocols'),
+  getEnrolled: () => api.get('/protocols/enrolled'),
+  enroll: (protocolId, preAssessmentScore) => api.post('/protocols/enroll', { protocolId, preAssessmentScore }),
+  getCurrentSession: (protocolId) => api.get(`/protocols/${protocolId}/session`),
+  completeSession: (protocolId, data) => api.post(`/protocols/${protocolId}/complete`, data),
+  getProgress: (protocolId) => api.get(`/protocols/${protocolId}/progress`),
+  unenroll: (protocolId) => api.delete(`/protocols/${protocolId}`)
+};
+
+// Clinical Assessments API (Enhancement 7)
+export const assessmentsAPI = {
+  getAvailable: () => api.get('/assessments'),
+  getDue: () => api.get('/assessments/due'),
+  getLatestScores: () => api.get('/assessments/scores'),
+  getAssessment: (instrument) => api.get(`/assessments/${instrument}`),
+  submit: (instrument, data) => api.post(`/assessments/${instrument}/submit`, data),
+  getHistory: (instrument, limit) => api.get(`/assessments/${instrument}/history`, { params: { limit } })
+};
+
+// Enhanced Peer Support API (Enhancement 8)
+export const enhancedPeerAPI = {
+  getPattern: () => api.get('/peer-support/enhanced/pattern'),
+  getMatches: () => api.get('/peer-support/enhanced/matches'),
+  suggestGroup: () => api.get('/peer-support/enhanced/suggest-group'),
+  createExercise: (data) => api.post('/peer-support/enhanced/exercises', data),
+  getExercises: (groupId) => api.get(`/peer-support/enhanced/exercises/${groupId}`),
+  respondToExercise: (exerciseId, content) => api.post(`/peer-support/enhanced/exercises/${exerciseId}/respond`, { content }),
+  getMentorships: () => api.get('/peer-support/enhanced/mentorships')
+};
+
+// Clinician Reports API (Enhancement 9)
+export const clinicianReportsAPI = {
+  generate: (startDate, endDate) => api.post('/clinician-reports/generate', { startDate, endDate }),
+  getAll: () => api.get('/clinician-reports'),
+  getById: (reportId) => api.get(`/clinician-reports/${reportId}`),
+  checkEscalation: () => api.get('/clinician-reports/escalation')
+};
+
 // Admin API (separate instance with admin token)
 const adminApi = axios.create({
   baseURL: API_BASE_URL,

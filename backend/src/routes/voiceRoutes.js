@@ -1,8 +1,3 @@
-/**
- * Voice Analysis Routes
- * Routes for voice emotion analysis
- */
-
 const express = require('express');
 const router = express.Router();
 const { body, query } = require('express-validator');
@@ -14,40 +9,19 @@ const validate = require('../middleware/validation');
 router.use(authenticateToken);
 
 // Validation rules
-const analyzeValidation = [
-  body('audioFeatures').isObject().withMessage('Audio features object is required'),
-  body('transcript').optional().isString()
+const sampleValidation = [
+  body('features').isObject().withMessage('Features must be an object'),
+  body('moodScore').optional().isInt({ min: 1, max: 10 }).withMessage('Mood score must be between 1-10')
 ];
 
-const linkValidation = [
-  body('entryId').isUUID().withMessage('Valid entry ID is required')
+const historyValidation = [
+  query('days').optional().isInt({ min: 1, max: 365 }).withMessage('Days must be between 1-365')
 ];
 
-/**
- * POST /api/voice/analyze
- * Analyze voice recording for emotional content
- * Body: { audioFeatures: {...}, transcript?: string }
- */
-router.post('/analyze', analyzeValidation, validate, voiceController.analyzeVoice);
-
-/**
- * GET /api/voice/baseline
- * Get user's voice baseline
- */
+// Voice routes
+router.post('/sample', sampleValidation, validate, voiceController.recordSample);
 router.get('/baseline', voiceController.getBaseline);
-
-/**
- * GET /api/voice/history
- * Get user's voice analysis history
- * Query params: limit (default 10)
- */
-router.get('/history', voiceController.getAnalysisHistory);
-
-/**
- * POST /api/voice/:analysisId/link
- * Link voice analysis to a mood entry
- * Body: { entryId: uuid }
- */
-router.post('/:analysisId/link', linkValidation, validate, voiceController.linkToMoodEntry);
+router.get('/history', historyValidation, validate, voiceController.getHistory);
+router.get('/correlation', voiceController.getCorrelation);
 
 module.exports = router;

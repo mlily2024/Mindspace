@@ -1,5 +1,6 @@
 const logger = require('../config/logger');
 const { isUserOnline } = require('../config/socketio');
+const webPushModule = require('./webPushService');
 
 /**
  * Real-time Notification Service
@@ -27,7 +28,21 @@ class NotificationService {
       timestamp: new Date().toISOString()
     };
 
+    // Channel 1: Socket.io (online users — instant, in-app, no permission prompt).
     this.io.to(`user:${userId}`).emit(event, payload);
+
+    // Channel 2: Web Push (offline users — OS-level notification even when the
+    // tab is closed). Best-effort, fire-and-forget: a network hiccup here must
+    // never block the in-app channel or the caller. Disabled gracefully when
+    // VAPID keys are not configured.
+    const pushPayload = {
+      title: NotificationService._titleForEvent(event),
+      body:  NotificationService._bodyForEvent(event, payload),
+      data:  { event, ...payload }
+    };
+    webPushModule.getInstance().sendToUser(userId, pushPayload).catch((err) => {
+      logger.warn('Web Push dispatch failed', { userId, event, error: err && err.message });
+    });
 
     logger.info('Notification sent', {
       userId,
@@ -36,6 +51,53 @@ class NotificationService {
     });
 
     return true;
+  }
+
+  /**
+   * Map an internal event name to a user-readable notification title.
+   * @private
+   */
+  static _titleForEvent(event) {
+    const map = {
+      'alert:safety':       'Mindspace — Safety check',
+      'achievement:earned': 'Mindspace — Achievement unlocked',
+      'insight:new':        'Mindspace — New insight',
+      'recommendation:new': 'Mindspace — New suggestion',
+      'streak:update':      'Mindspace — Streak update',
+      'peer:new_message':   'Mindspace — New peer message'
+    };
+    return map[event] || 'Mindspace';
+  }
+
+  /**
+   * Extract a meaningful one-line body from the per-event payload.
+   * @private
+   */
+  static _bodyForEvent(event, payload) {
+    switch (event) {
+      case 'alert:safety':
+        return (payload.alert && payload.alert.message) || 'A safety concern has been detected.';
+      case 'achievement:earned':
+        return (payload.achievement && payload.achievement.name) || "You've earned a new achievement.";
+      case 'insight:new':
+        return (payload.insight && (payload.insight.title || payload.insight.description))
+          || 'A new insight is ready.';
+      case 'recommendation:new':
+        return (payload.recommendation && payload.recommendation.title) || 'A new suggestion for you.';
+      case 'streak:update':
+        return payload.streak
+          ? `You're on a ${payload.streak.currentStreak}-day streak!`
+          : 'Streak update.';
+      case 'peer:new_message':
+        if (payload.message) {
+          const who = payload.message.senderNickname || 'Someone';
+          const what = (payload.message.content || '').slice(0, 100);
+          return `${who}: ${what}`;
+        }
+        return 'New message in your peer group.';
+      default:
+        return 'You have a new notification.';
+    }
   }
 
   /**

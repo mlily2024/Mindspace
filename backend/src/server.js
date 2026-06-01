@@ -37,6 +37,8 @@ const protocolRoutes = require('./routes/protocolRoutes');
 const assessmentRoutes = require('./routes/assessmentRoutes');
 const enhancedPeerRoutes = require('./routes/enhancedPeerRoutes');
 const clinicianReportRoutes = require('./routes/clinicianReportRoutes');
+// Web Push (Stage D)
+const pushRoutes = require('./routes/pushRoutes');
 
 // Initialize Express app
 const app = express();
@@ -153,6 +155,7 @@ app.use('/api/protocols', protocolRoutes);
 app.use('/api/assessments', assessmentRoutes);
 app.use('/api/peer-support/enhanced', enhancedPeerRoutes);
 app.use('/api/clinician-reports', clinicianReportRoutes);
+app.use('/api/push', pushRoutes);
 
 // 404 handler
 app.use(notFound);

@@ -28,7 +28,8 @@
     "winston": "^3.11.0",
     "date-fns": "^3.0.6",
     "socket.io": "^4.7.2",
-    "@anthropic-ai/sdk": "^0.50.0"
+    "@anthropic-ai/sdk": "^0.50.0",
+    "web-push": "^3.6.7"
   },
   "devDependencies": {
     "nodemon": "^3.0.2",

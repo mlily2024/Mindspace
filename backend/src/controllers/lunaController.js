@@ -7,9 +7,9 @@ const logger = require('../config/logger');
 const sendMessage = async (req, res, next) => {
   try {
     const { message, sessionId } = req.body;
-    const result = await lunaService.sendMessage(req.user.userId, message, sessionId);
+    const result = await lunaService.processMessage(req.user.userId, message, sessionId);
 
-    logger.info('Luna message sent', { userId: req.user.userId, sessionId: result.sessionId });
+    logger.info('Luna message sent', { userId: req.user.userId, sessionId });
 
     res.json({
       success: true,
@@ -26,7 +26,7 @@ const sendMessage = async (req, res, next) => {
 const getJournal = async (req, res, next) => {
   try {
     const limit = req.query.limit ? parseInt(req.query.limit) : undefined;
-    const journal = await lunaService.getJournal(req.user.userId, limit);
+    const journal = await lunaService.getTherapeuticJournal(req.user.userId, limit);
 
     res.json({
       success: true,
@@ -92,7 +92,8 @@ const getTechniqueEffectiveness = async (req, res, next) => {
  */
 const suggestRefinements = async (req, res, next) => {
   try {
-    const refinements = await lunaService.suggestRefinements(req.user.userId, req.query.emotion);
+    // suggestRefinements is synchronous on the service and takes a single emotion label.
+    const refinements = lunaService.suggestRefinements(req.query.emotion);
 
     res.json({
       success: true,

@@ -8,13 +8,14 @@
 
 const db = require('../config/database');
 const logger = require('../config/logger');
+const safetyFilter = require('./safetyFilter');
+const responseGeneratorFactory = require('./responseGeneratorFactory');
+const RuleBasedResponseGenerator = require('./ruleBasedResponseGenerator');
 
 // ─── Keyword dictionaries ─────────────────────────────────────────────────────
-
-const CRISIS_KEYWORDS = [
-  'suicide', 'kill myself', 'end it all', 'self-harm',
-  'cutting', 'overdose', 'die', 'no point living'
-];
+// NOTE: Crisis keywords now live in safetyFilter (UK_CRISIS_KEYWORDS).
+//       _detectCrisis delegates to safetyFilter.detect() so the safety
+//       contract is centralised and externally auditable.
 
 const NEGATIVE_KEYWORDS = [
   'sad', 'depressed', 'anxious', 'worried', 'stressed',
@@ -672,20 +673,12 @@ class LunaService {
     try {
       const lowerMsg = (message || '').toLowerCase();
 
-      // 1. Crisis detection (highest priority)
+      // 1. Crisis detection (highest priority — NEVER delegated to a provider).
       const crisisDetected = this._detectCrisis(lowerMsg);
-
       if (crisisDetected) {
-        // Log the crisis event
         await this.addJournalEntry(userId, 'concern', 'Crisis language detected in conversation', sessionId);
-
         return {
-          response:
-            'I\'m really concerned about what you\'re sharing, and I want you to know you\'re not alone. ' +
-            'What you\'re feeling is serious, and you deserve immediate support from someone trained to help. ' +
-            'Please reach out to the 988 Suicide & Crisis Lifeline by calling or texting 988, or contact the ' +
-            'Crisis Text Line by texting HOME to 741741. If you\'re in immediate danger, please call 911. ' +
-            'I care about your safety — will you reach out to one of these resources right now?',
+          response: safetyFilter.buildResponse(),
           suggestedTechnique: null,
           moodDetected: 'crisis',
           crisisDetected: true,
@@ -693,38 +686,71 @@ class LunaService {
         };
       }
 
-      // 2. Sentiment analysis
+      // 2. Sentiment + theme (one extraction, reused for journaling and provider input).
       const moodDetected = this._analyzeSentiment(lowerMsg);
+      const theme = this._extractTheme(lowerMsg);
 
-      // 3. Get session context & data context
+      // 3. Context (session, data, profile in parallel).
       const [sessionContext, dataContext, profile] = await Promise.all([
         this.getSessionContext(userId),
         this.generateDataContext(userId),
         this.getProfile(userId)
       ]);
 
-      // 4. Determine mood score for technique recommendation
+      // 4. Mood score → technique recommendation.
       const moodScore = this._moodToScore(moodDetected);
-
-      // 5. Get recommended technique
       let suggestedTechnique = null;
       if (moodScore <= 3) {
         suggestedTechnique = await this.recommendTechnique(userId, moodScore);
       }
 
-      // 6. Build response
-      const response = this._buildResponse(message, moodDetected, sessionContext, dataContext, suggestedTechnique);
-
-      // 7. Log theme if we can extract one
-      const theme = this._extractTheme(lowerMsg);
-      if (theme) {
-        await this.addJournalEntry(userId, 'theme', theme, sessionId);
-      }
-
-      // 8. Update session count
+      // 5. Parse profile data — needed for per-user LLM opt-in AND session counter.
       const profileData = typeof profile.profile_data === 'string'
         ? JSON.parse(profile.profile_data)
         : (profile.profile_data || {});
+
+      // 6. Delegate response generation. Two-tier consent for the LLM provider:
+      //    (a) LUNA_PROVIDER env enables the LLM provider at the deployment level
+      //    (b) profile.llm_opted_in === true enables it for THIS user
+      //    If EITHER is missing, the user transparently gets rule-based.
+      //    A provider error falls through to a fresh rule-based instance.
+      const providerInput = {
+        userId,
+        message,
+        mood: moodDetected,
+        theme,
+        sessionContext,
+        dataContext,
+        technique: suggestedTechnique
+      };
+      const userOptedIn = profileData.llm_opted_in === true;
+      const provider = userOptedIn
+        ? responseGeneratorFactory.getProvider()
+        : new RuleBasedResponseGenerator();
+      let response;
+      try {
+        response = await provider.generate(providerInput);
+      } catch (providerError) {
+        logger.warn('Luna response provider failed; falling back to rule_based', {
+          provider: provider.name,
+          error: providerError.message,
+          userId
+        });
+        // Direct instantiation avoids polluting the factory cache.
+        const fallback = new RuleBasedResponseGenerator();
+        response = await fallback.generate(providerInput);
+      }
+
+      // 7. Log theme (best-effort — must never block the response).
+      if (theme) {
+        try {
+          await this.addJournalEntry(userId, 'theme', theme, sessionId);
+        } catch (journalErr) {
+          logger.warn('Failed to log theme to journal', { error: journalErr.message, userId });
+        }
+      }
+
+      // 8. Update session count.
       await this.updateProfile(userId, {
         session_count: (profileData.session_count || 0) + 1
       });
@@ -745,7 +771,7 @@ class LunaService {
     } catch (error) {
       logger.error('Error processing Luna message', { error: error.message, userId });
       return {
-        response: 'I\'m here with you. Could you tell me a bit more about how you\'re feeling right now?',
+        response: "I'm here with you. Could you tell me a bit more about how you're feeling right now?",
         suggestedTechnique: null,
         moodDetected: 'unknown',
         crisisDetected: false,
@@ -760,10 +786,15 @@ class LunaService {
 
   /**
    * Check message for crisis keywords.
+   *
+   * Delegates to the centralised UK-localised SafetyFilter so all
+   * Luna response paths (rule-based + future LLM-backed) share an
+   * identical, externally-auditable detection contract.
+   *
    * @private
    */
   static _detectCrisis(lowerMsg) {
-    return CRISIS_KEYWORDS.some(kw => lowerMsg.includes(kw));
+    return safetyFilter.detect(lowerMsg);
   }
 
   /**
@@ -822,51 +853,6 @@ class LunaService {
       positive: 4
     };
     return map[mood] || 3;
-  }
-
-  /**
-   * Build the final text response based on mood, context, and suggested technique.
-   * @private
-   */
-  static _buildResponse(message, mood, sessionContext, dataContext, technique) {
-    const parts = [];
-
-    // Opening — empathetic acknowledgement
-    if (mood === 'neutral' || mood === 'unknown') {
-      parts.push('Thank you for sharing. I\'m here and listening.');
-    } else if (['happy', 'good', 'great', 'excited', 'proud', 'positive', 'calm', 'grateful', 'hopeful', 'peaceful', 'better'].includes(mood)) {
-      parts.push('It\'s really good to hear that. I\'m glad you\'re in that space right now.');
-    } else {
-      parts.push('I hear you, and I\'m sorry you\'re going through this. What you\'re feeling is real and it matters.');
-    }
-
-    // Data-informed observation (if we have trend data)
-    if (dataContext.trendDirection === 'improving' && !['happy', 'good', 'great', 'positive'].includes(mood)) {
-      parts.push('I also want you to know that looking at your recent data, things have been gradually trending upward, even if today feels hard.');
-    } else if (dataContext.trendDirection === 'declining') {
-      parts.push('I\'ve noticed your mood has been dipping over the past couple of weeks. That takes courage to sit with, and it\'s exactly why checking in matters.');
-    }
-
-    // Continuity from previous sessions
-    if (sessionContext.keyThemes && sessionContext.keyThemes.length > 0) {
-      parts.push(`Last time, we touched on "${sessionContext.keyThemes[0]}." Would you like to pick that thread back up, or is something else more present for you today?`);
-    }
-
-    // Technique suggestion
-    if (technique && technique.strategy) {
-      const theme = this._extractTheme((message || '').toLowerCase()) || 'what you\'re experiencing';
-      const strategyText = technique.strategy.template(theme);
-      parts.push(strategyText);
-    }
-
-    // Combine and trim to ~200 words
-    let response = parts.join(' ');
-    const words = response.split(/\s+/);
-    if (words.length > 200) {
-      response = words.slice(0, 200).join(' ') + '...';
-    }
-
-    return response;
   }
 
   /**

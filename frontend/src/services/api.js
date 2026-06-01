@@ -378,6 +378,17 @@ export const clinicianReportsAPI = {
   checkEscalation: () => api.get('/clinician-reports/escalation')
 };
 
+// ============================================
+// Web Push API (Stage E)
+// ============================================
+export const pushAPI = {
+  // Public — needed at service-worker registration time, no auth required.
+  getVapidPublicKey: () => api.get('/push/vapid-public-key'),
+  // Authenticated — register / remove this browser's subscription.
+  subscribe:   (subscription) => api.post('/push/subscribe', subscription),
+  unsubscribe: (data)         => api.delete('/push/unsubscribe', { data })
+};
+
 // Admin API (separate instance with admin token)
 const adminApi = axios.create({
   baseURL: API_BASE_URL,

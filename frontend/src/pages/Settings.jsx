@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Navigation from '../components/Navigation';
 import { useAuth } from '../context/AuthContext';
 import { authAPI } from '../services/api';
+import pushService from '../services/pushService';
 
 const Settings = () => {
   const { user, updateProfile, updatePreferences } = useAuth();
@@ -232,6 +233,8 @@ const Settings = () => {
                 {loading ? 'Saving...' : 'Save Preferences'}
               </button>
             </form>
+
+            <PushNotificationToggle />
           </div>
         )}
 
@@ -240,6 +243,134 @@ const Settings = () => {
         )}
       </main>
     </>
+  );
+};
+
+// Push notifications opt-in (Stage E)
+// Lives at the bottom of the Preferences tab — separate from the server-side
+// notificationsEnabled preference above (that's for in-app/email; this is
+// for OS-level browser push when the tab is closed).
+const PushNotificationToggle = () => {
+  const [status, setStatus]   = useState('loading'); // loading | unsupported | denied | enabled | disabled
+  const [busy, setBusy]       = useState(false);
+  const [message, setMessage] = useState('');
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      if (!pushService.isSupported()) {
+        if (!cancelled) setStatus('unsupported');
+        return;
+      }
+      const perm = pushService.getStatus();
+      if (perm === 'denied') {
+        if (!cancelled) setStatus('denied');
+        return;
+      }
+      const sub = await pushService.getSubscription();
+      if (!cancelled) setStatus(sub ? 'enabled' : 'disabled');
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
+  const handleEnable = async () => {
+    setBusy(true);
+    setMessage('');
+    const result = await pushService.enable();
+    setBusy(false);
+    if (result.ok) {
+      setStatus('enabled');
+      setMessage('Push notifications enabled — you will now receive OS notifications when the tab is closed.');
+    } else {
+      setMessage(result.error || 'Could not enable push notifications.');
+      // Re-check status (the permission may now be 'denied' after the prompt).
+      if (pushService.getStatus() === 'denied') setStatus('denied');
+    }
+  };
+
+  const handleDisable = async () => {
+    setBusy(true);
+    setMessage('');
+    const result = await pushService.disable();
+    setBusy(false);
+    if (result.ok) {
+      setStatus('disabled');
+      setMessage('Push notifications disabled for this browser.');
+    } else {
+      setMessage(result.error || 'Could not disable push notifications.');
+    }
+  };
+
+  const isError = message && /could not|fail|denied|not granted/i.test(message);
+
+  return (
+    <div
+      style={{
+        marginTop: 'var(--spacing-xl)',
+        paddingTop: 'var(--spacing-lg)',
+        borderTop: '1px solid var(--border)'
+      }}
+    >
+      <h3 style={{ marginBottom: 'var(--spacing-sm)', display: 'flex', alignItems: 'center', gap: 'var(--spacing-sm)' }}>
+        <span>🔔</span> Push notifications (browser)
+      </h3>
+      <p style={{ color: 'var(--text-secondary)', marginBottom: 'var(--spacing-md)' }}>
+        Get OS-level notifications even when the Mindspace tab is closed — safety alerts,
+        new insights, streak milestones and peer messages will surface on your device.
+        Independent of the in-app notification preference above.
+      </p>
+
+      {status === 'loading' && (
+        <p style={{ color: 'var(--text-secondary)' }}>Checking notification status…</p>
+      )}
+
+      {status === 'unsupported' && (
+        <p style={{ color: 'var(--text-secondary)' }}>
+          Your browser does not support push notifications.
+        </p>
+      )}
+
+      {status === 'denied' && (
+        <p style={{ color: 'var(--danger-color)' }}>
+          Notifications are blocked for this site. To enable, change the site permissions in
+          your browser settings, then reload this page.
+        </p>
+      )}
+
+      {status === 'disabled' && (
+        <button
+          type="button"
+          className="btn btn-primary"
+          onClick={handleEnable}
+          disabled={busy}
+        >
+          {busy ? 'Enabling…' : 'Enable push notifications'}
+        </button>
+      )}
+
+      {status === 'enabled' && (
+        <button
+          type="button"
+          className="btn"
+          onClick={handleDisable}
+          disabled={busy}
+          style={{ backgroundColor: 'var(--surface)' }}
+        >
+          {busy ? 'Disabling…' : 'Disable push notifications'}
+        </button>
+      )}
+
+      {message && (
+        <p
+          style={{
+            marginTop: 'var(--spacing-md)',
+            color: isError ? 'var(--danger-color)' : 'var(--text-secondary)'
+          }}
+        >
+          {message}
+        </p>
+      )}
+    </div>
   );
 };
 

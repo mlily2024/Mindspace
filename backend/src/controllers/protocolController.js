@@ -90,7 +90,7 @@ const getProgress = async (req, res, next) => {
  */
 const getUserProtocols = async (req, res, next) => {
   try {
-    const userId = req.user.userId;
+    const _userId = req.user.userId;
 
     // TODO: implement with Protocol model
     res.json({ success: true, data: [] });

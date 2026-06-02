@@ -409,7 +409,7 @@ class InsightsEngine {
    */
   static findCorrelations(entries) {
     const correlations = [];
-    const overallAvg = entries.reduce((a, e) => a + parseFloat(e.mood_score), 0) / entries.length;
+    const _overallAvg = entries.reduce((a, e) => a + parseFloat(e.mood_score), 0) / entries.length;
 
     // Sleep correlation
     const sleepEntries = entries.filter(e => e.sleep_hours);

@@ -398,7 +398,7 @@ class MicroInterventionService {
    * Check if user should receive intervention notification
    * (For proactive push notifications - future feature)
    */
-  static async checkForProactiveIntervention(userId) {
+  static async checkForProactiveIntervention(_userId) {
     // This could be called by a scheduler to check if user
     // should receive a proactive intervention based on:
     // - Time of day patterns

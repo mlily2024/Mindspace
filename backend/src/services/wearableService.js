@@ -134,7 +134,7 @@ class WearableService {
   /**
    * Handle OAuth callback (for real OAuth flows)
    */
-  static async handleOAuthCallback(userId, deviceType, code, state) {
+  static async handleOAuthCallback(userId, deviceType, _code, _state) {
     // In production, exchange code for tokens
     // For now, use mock provider
     return await this.connectMockDevice(userId, deviceType);
@@ -208,7 +208,7 @@ class WearableService {
     await WearableConnection.updateSyncStatus(connectionId, 'syncing');
 
     // Log sync start
-    const syncLog = await WearableConnection.logSync(connectionId, userId, {
+    const _syncLog = await WearableConnection.logSync(connectionId, userId, {
       syncType,
       syncStatus: 'started',
       dateRangeStart: startDate,
@@ -438,6 +438,8 @@ class WearableService {
    * Remove sensitive data from connection object
    */
   static sanitizeConnection(connection) {
+    // Intentionally destructure tokens out so they never reach the response.
+    // eslint-disable-next-line no-unused-vars
     const { access_token, refresh_token, token_expires_at, ...safe } = connection;
     return {
       ...safe,

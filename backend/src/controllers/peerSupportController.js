@@ -391,7 +391,7 @@ const flagMessage = async (req, res, next) => {
       });
     }
 
-    const flaggedMessage = await PeerSupport.flagMessage(messageId, reason || 'Flagged by user');
+    const _flaggedMessage = await PeerSupport.flagMessage(messageId, reason || 'Flagged by user');
 
     logger.info('Message flagged', { messageId, userId: req.user.userId, reason });
 

@@ -53,10 +53,10 @@ const getHistory = async (req, res, next) => {
   try {
     const { instrument } = req.params;
     const { limit } = req.query;
-    const userId = req.user.userId;
+    const _userId = req.user.userId;
 
     // TODO: implement with Assessment model
-    res.json({ success: true, data: { instrument, limit, userId } });
+    res.json({ success: true, data: { instrument, limit, userId: _userId } });
   } catch (error) {
     logger.error('Error fetching assessment history', { error: error.message });
     next(error);
@@ -68,7 +68,7 @@ const getHistory = async (req, res, next) => {
  */
 const getLatestScores = async (req, res, next) => {
   try {
-    const userId = req.user.userId;
+    const _userId = req.user.userId;
 
     // TODO: implement with Assessment model
     res.json({ success: true, data: [] });
@@ -83,7 +83,7 @@ const getLatestScores = async (req, res, next) => {
  */
 const checkDue = async (req, res, next) => {
   try {
-    const userId = req.user.userId;
+    const _userId = req.user.userId;
 
     // TODO: implement with Assessment model
     res.json({ success: true, data: [] });

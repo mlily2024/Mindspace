@@ -5,7 +5,7 @@
 
 const express = require('express');
 const router = express.Router();
-const { body, query } = require('express-validator');
+const { body } = require('express-validator');
 const predictiveController = require('../controllers/predictiveController');
 const { authenticateToken } = require('../middleware/auth');
 const validate = require('../middleware/validation');
@@ -18,7 +18,7 @@ const generateValidation = [
   body('days').optional().isInt({ min: 1, max: 14 }).withMessage('Days must be between 1-14')
 ];
 
-const dateValidation = [
+const _dateValidation = [
   // Date format validated in controller
 ];
 

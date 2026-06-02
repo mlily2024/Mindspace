@@ -20,7 +20,7 @@ const getPatternProfile = async (req, res, next) => {
  */
 const findMatches = async (req, res, next) => {
   try {
-    const userId = req.user.userId;
+    const _userId = req.user.userId;
 
     // TODO: implement with EnhancedPeer model
     res.json({ success: true, data: [] });
@@ -71,8 +71,8 @@ const createExercise = async (req, res, next) => {
  */
 const getGroupExercises = async (req, res, next) => {
   try {
-    const { groupId } = req.params;
-    const userId = req.user.userId;
+    const { groupId: _groupId } = req.params;
+    const _userId = req.user.userId;
 
     // TODO: implement with EnhancedPeer model
     res.json({ success: true, data: [] });
@@ -106,7 +106,7 @@ const submitExerciseResponse = async (req, res, next) => {
  */
 const getMentorships = async (req, res, next) => {
   try {
-    const userId = req.user.userId;
+    const _userId = req.user.userId;
 
     // TODO: implement with EnhancedPeer model
     res.json({ success: true, data: [] });

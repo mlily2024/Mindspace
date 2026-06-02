@@ -4,7 +4,6 @@
  * using Pearson correlation coefficient with statistical significance testing
  */
 
-const db = require('../config/database');
 const WearableConnection = require('../models/WearableConnection');
 const MoodEntry = require('../models/MoodEntry');
 const logger = require('../config/logger');
@@ -129,6 +128,10 @@ class BiometricCorrelationService {
   /**
    * Log gamma function approximation (Stirling's approximation)
    */
+  // Stirling's approximation uses long numeric literals where the last digits
+  // may not be exactly representable as IEEE 754 doubles — that loss of
+  // precision is expected and acceptable for this mathematical approximation.
+  /* eslint-disable no-loss-of-precision */
   static logGamma(x) {
     const c = [
       76.18009172947146,
@@ -150,6 +153,7 @@ class BiometricCorrelationService {
 
     return -tmp + Math.log(2.5066282746310005 * ser / x);
   }
+  /* eslint-enable no-loss-of-precision */
 
   /**
    * Continued fraction for incomplete beta function
@@ -217,7 +221,7 @@ class BiometricCorrelationService {
    * Calculate all correlations for a user
    */
   static async calculateUserCorrelations(userId, options = {}) {
-    const { days = 30, forceRecalculate = false } = options;
+    const { days = 30, forceRecalculate: _forceRecalculate = false } = options;
 
     try {
       // Get date range
@@ -335,7 +339,7 @@ class BiometricCorrelationService {
           }
 
           // Calculate correlation
-          const { coefficient, meanX, meanY } = this.calculatePearsonCorrelation(
+          const { coefficient, meanX: _meanX, meanY: _meanY } = this.calculatePearsonCorrelation(
             biometricValues,
             moodValues
           );
@@ -438,7 +442,7 @@ class BiometricCorrelationService {
 
     const biometricLabel = this.getBiometricLabel(biometricType);
     const moodLabel = this.getMoodMetricLabel(moodMetric);
-    const directionWord = direction === 'positive' ? 'increases' : 'decreases';
+    const _directionWord = direction === 'positive' ? 'increases' : 'decreases';
     const inverseWord = direction === 'positive' ? 'lower' : 'higher';
 
     let title, description, recommendations;

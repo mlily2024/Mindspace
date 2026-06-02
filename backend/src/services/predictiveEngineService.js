@@ -11,7 +11,7 @@
 const db = require('../config/database');
 const logger = require('../config/logger');
 const { v4: uuidv4 } = require('uuid');
-const { format, subDays, addDays, differenceInDays, getDay } = require('date-fns');
+const { format, subDays, addDays, getDay } = require('date-fns');
 
 // Maps risk factors to preventive action suggestions
 const PREVENTIVE_ACTIONS = {

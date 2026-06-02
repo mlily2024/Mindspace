@@ -46,7 +46,7 @@ const registerSocketHandlers = (io, socket, services = {}) => {
 /**
  * Peer Chat Socket Handlers
  */
-const registerPeerChatHandlers = (io, socket, services) => {
+const registerPeerChatHandlers = (io, socket, _services) => {
   const userId = socket.userId;
 
   // Rate limiters: 30 events/min for actions, 10/sec for typing
@@ -184,7 +184,7 @@ const registerPeerChatHandlers = (io, socket, services) => {
 /**
  * Notification Socket Handlers
  */
-const registerNotificationHandlers = (io, socket, services) => {
+const registerNotificationHandlers = (io, socket, _services) => {
   const userId = socket.userId;
 
   // Acknowledge a notification
@@ -210,7 +210,7 @@ const registerNotificationHandlers = (io, socket, services) => {
   });
 
   // Request notification count (unread)
-  socket.on('notification:get_count', async (data) => {
+  socket.on('notification:get_count', async (_data) => {
     try {
       // This would be integrated with a notification storage system
       // For now, emit a placeholder response

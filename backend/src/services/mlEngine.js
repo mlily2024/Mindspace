@@ -20,7 +20,7 @@ const linearRegression = (x, y) => {
   const sumY = y.reduce((a, b) => a + b, 0);
   const sumXY = x.reduce((acc, xi, i) => acc + xi * y[i], 0);
   const sumX2 = x.reduce((acc, xi) => acc + xi * xi, 0);
-  const sumY2 = y.reduce((acc, yi) => acc + yi * yi, 0);
+  const _sumY2 = y.reduce((acc, yi) => acc + yi * yi, 0);
 
   const denominator = n * sumX2 - sumX * sumX;
   if (denominator === 0) {
@@ -405,7 +405,7 @@ const generateMLInsights = (moodEntries) => {
   const moods = moodEntries.map(e => e.mood_score);
   const stress = moodEntries.map(e => e.stress_level || 5);
   const energy = moodEntries.map(e => e.energy_level || 5);
-  const anxiety = moodEntries.map(e => e.anxiety_level || 5);
+  const _anxiety = moodEntries.map(e => e.anxiety_level || 5);
   const sleep = moodEntries.map(e => e.sleep_hours || 7);
 
   // Predict next mood

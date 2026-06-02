@@ -6,7 +6,7 @@
 const db = require('../config/database');
 const logger = require('../config/logger');
 const { v4: uuidv4 } = require('uuid');
-const { format, subDays, addDays, parseISO, differenceInDays, getDay } = require('date-fns');
+const { format, addDays, differenceInDays, getDay } = require('date-fns');
 const WearableConnection = require('../models/WearableConnection');
 
 class PredictiveMoodService {
@@ -617,7 +617,7 @@ class PredictiveMoodService {
     if (entries.length < 5) return {};
 
     const correlations = {};
-    const moods = entries.map(e => parseFloat(e.mood_score));
+    const _moods = entries.map(e => parseFloat(e.mood_score));
 
     // Sleep hours correlation
     const sleepEntries = entries.filter(e => e.sleep_hours);

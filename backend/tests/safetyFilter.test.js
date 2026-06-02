@@ -74,7 +74,9 @@ describe('SafetyFilter', () => {
       expect(response).not.toMatch(/\b988\b/);
       expect(response).not.toMatch(/\b911\b/);
       expect(response).not.toMatch(/741741/);
-      expect(response).not.toMatch(/Crisis Text Line/);
+      // Note: UK Shout is named "Shout Crisis Text Line" so we don't
+      // assert against that phrase — the regression guard is the
+      // specific US numbers above.
     });
 
     it('opens with empathetic acknowledgement', () => {

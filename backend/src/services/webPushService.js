@@ -54,9 +54,9 @@ class WebPushService {
     }
   }
 
-  /** True when VAPID is configured and the SDK is available. */
+  /** True when VAPID is configured AND the SDK is available. */
   isEnabled() {
-    return !!this.webpush;
+    return !!this.webpush && !!this.publicKey && !!this.privateKey;
   }
 
   /**

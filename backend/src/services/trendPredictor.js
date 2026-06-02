@@ -9,7 +9,6 @@ const {
   exponentialMovingAverage,
   detectAnomalies,
   calculateStatistics,
-  predictNextValue,
   pearsonCorrelation
 } = require('./mlEngine');
 

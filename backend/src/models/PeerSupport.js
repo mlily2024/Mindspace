@@ -1,6 +1,5 @@
 const db = require('../config/database');
 const { v4: uuidv4 } = require('uuid');
-const { encrypt, decrypt } = require('../utils/encryption');
 
 /**
  * PeerSupport Model

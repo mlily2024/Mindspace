@@ -11,7 +11,9 @@ const PushSubscription = require('../src/models/PushSubscription');
 jest.mock('../src/models/PushSubscription', () => ({
   findByUser:        jest.fn(),
   deleteByEndpoint:  jest.fn(),
-  touchLastUsed:     jest.fn()
+  // touchLastUsed is fire-and-forget in production code (.catch on the
+  // returned promise), so the mock must return a thenable.
+  touchLastUsed:     jest.fn().mockResolvedValue(undefined)
 }));
 
 const makeSub = (overrides = {}) => ({

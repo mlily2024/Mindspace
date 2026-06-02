@@ -2,7 +2,7 @@ const db = require('../config/database');
 const { v4: uuidv4 } = require('uuid');
 const MoodEntry = require('../models/MoodEntry');
 const { subDays, format } = require('date-fns');
-const { generateMLInsights, correlationMatrix, detectAnomalies } = require('./mlEngine');
+const { generateMLInsights } = require('./mlEngine');
 const { segmentUser, getSegmentRecommendations } = require('./userSegmentation');
 const { detectWarningSignals, predictMood } = require('./trendPredictor');
 
@@ -19,7 +19,7 @@ class RecommendationService {
     const startDate = format(subDays(new Date(), 7), 'yyyy-MM-dd');
 
     const statistics = await MoodEntry.getStatistics(userId, { startDate, endDate });
-    const recentEntries = await MoodEntry.getUserEntries(userId, {
+    const _recentEntries = await MoodEntry.getUserEntries(userId, {
       startDate,
       endDate,
       limit: 7

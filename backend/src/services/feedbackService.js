@@ -5,7 +5,6 @@
 
 const db = require('../config/database');
 const logger = require('../config/logger');
-const { format, subDays } = require('date-fns');
 
 class FeedbackService {
   /**
@@ -259,7 +258,7 @@ class FeedbackService {
   /**
    * Generate immediate action suggestions
    */
-  static generateImmediateSuggestions(moodEntry, comparison) {
+  static generateImmediateSuggestions(moodEntry, _comparison) {
     const suggestions = [];
     const mood = parseInt(moodEntry.mood_score);
     const energy = parseInt(moodEntry.energy_level) || 5;

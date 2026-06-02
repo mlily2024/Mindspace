@@ -111,7 +111,7 @@ const connectMockDevice = async (req, res, next) => {
  * Handle OAuth callback from wearable provider
  * GET /api/wearables/callback/:deviceType
  */
-const handleOAuthCallback = async (req, res, next) => {
+const handleOAuthCallback = async (req, res, _next) => {
   try {
     const { deviceType } = req.params;
     const { code, state, error: oauthError } = req.query;
@@ -128,7 +128,7 @@ const handleOAuthCallback = async (req, res, next) => {
       });
     }
 
-    const result = await WearableService.handleOAuthCallback(deviceType, code, state);
+    const _result = await WearableService.handleOAuthCallback(deviceType, code, state);
 
     // Redirect to frontend with success
     res.redirect(`/settings/wearables?connected=${deviceType}&success=true`);
@@ -444,7 +444,7 @@ const getBaselines = async (req, res, next) => {
  */
 const getSyncHistory = async (req, res, next) => {
   try {
-    const userId = req.user.userId;
+    const _userId = req.user.userId;
     const { connectionId } = req.params;
     const { limit = 10 } = req.query;
 

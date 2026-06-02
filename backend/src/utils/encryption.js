@@ -10,6 +10,8 @@ if (!ENCRYPTION_KEY || ENCRYPTION_KEY.length < 32) {
 // Derive a 32-byte key from the environment variable using SHA-256
 const KEY = crypto.createHash('sha256').update(ENCRYPTION_KEY).digest();
 const IV_LENGTH = 16;
+// AES-GCM auth tag is always 16 bytes — kept here as documentation only.
+// eslint-disable-next-line no-unused-vars
 const AUTH_TAG_LENGTH = 16;
 
 /**

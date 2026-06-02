@@ -1,6 +1,6 @@
 const ChatbotMessage = require('../models/ChatbotMessage');
 const logger = require('../config/logger');
-const { techniques, getTechniquesForEmotion, getRandomAffirmation, getRandomSmallWin } = require('../data/therapeuticTechniques');
+const { techniques, getRandomAffirmation, getRandomSmallWin } = require('../data/therapeuticTechniques');
 
 /**
  * Luna - AI Wellness Companion

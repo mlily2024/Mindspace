@@ -4,7 +4,7 @@
  */
 
 const db = require('../config/database');
-const { kMeansClustering, calculateStatistics } = require('./mlEngine');
+const { calculateStatistics } = require('./mlEngine');
 
 /**
  * User segment definitions

@@ -54,7 +54,7 @@ class BaseMockProvider {
   /**
    * Simulate OAuth authorization
    */
-  async authorize(userId) {
+  async authorize(_userId) {
     // Simulate OAuth delay
     await new Promise(resolve => setTimeout(resolve, 500));
 

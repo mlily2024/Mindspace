@@ -410,7 +410,7 @@ class VoiceAnalysisService {
       // Update existing baseline with exponential moving average
       // Weight recent samples more heavily for first few, then stabilize
       const alpha = existing.sample_count < 10 ? 0.3 : 0.1;
-      const count = existing.sample_count;
+      const _count = existing.sample_count;
 
       const updateQuery = `
         UPDATE user_voice_baselines

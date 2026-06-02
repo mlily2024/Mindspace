@@ -23,7 +23,7 @@ const generateReport = async (req, res, next) => {
  */
 const getReports = async (req, res, next) => {
   try {
-    const userId = req.user.userId;
+    const _userId = req.user.userId;
 
     // TODO: implement with ClinicianReport model
     res.json({ success: true, data: [] });
@@ -54,7 +54,7 @@ const getReport = async (req, res, next) => {
  */
 const checkEscalation = async (req, res, next) => {
   try {
-    const userId = req.user.userId;
+    const _userId = req.user.userId;
 
     // TODO: implement with ClinicianReport model
     res.json({ success: true, data: { escalationNeeded: false } });

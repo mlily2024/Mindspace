@@ -41,6 +41,8 @@ const clinicianReportRoutes = require('./routes/clinicianReportRoutes');
 const pushRoutes = require('./routes/pushRoutes');
 // Differential-privacy cohort aggregates (ADR-0005)
 const cohortInsightsRoutes = require('./routes/cohortInsightsRoutes');
+// On-device sentiment analysis (ADR-0006)
+const moodSentimentRoutes = require('./routes/moodSentimentRoutes');
 
 // Initialize Express app
 const app = express();
@@ -159,6 +161,7 @@ app.use('/api/peer-support/enhanced', enhancedPeerRoutes);
 app.use('/api/clinician-reports', clinicianReportRoutes);
 app.use('/api/push', pushRoutes);
 app.use('/api/cohort-insights', cohortInsightsRoutes);
+app.use('/api/mood-sentiments', moodSentimentRoutes);
 
 // 404 handler
 app.use(notFound);

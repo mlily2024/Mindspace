@@ -7,6 +7,7 @@
 const WearableConnection = require('../models/WearableConnection');
 const MoodEntry = require('../models/MoodEntry');
 const logger = require('../config/logger');
+const cache = require('./cacheService');
 
 class BiometricCorrelationService {
   // Minimum sample size for reliable correlations
@@ -815,6 +816,12 @@ class BiometricCorrelationService {
    * Get correlation summary for dashboard display
    */
   static async getCorrelationSummary(userId) {
+    return cache.wrap(cache.long, cache.key('correlationSummary', userId), () =>
+      this._getCorrelationSummaryUncached(userId)
+    );
+  }
+
+  static async _getCorrelationSummaryUncached(userId) {
     try {
       const correlations = await WearableConnection.getCorrelations(userId);
 

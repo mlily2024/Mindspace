@@ -3,6 +3,7 @@ const GamificationService = require('../services/gamificationService');
 const FeedbackService = require('../services/feedbackService');
 const MicroInterventionService = require('../services/microInterventionService');
 const PredictiveMoodService = require('../services/predictiveMoodService');
+const cache = require('../services/cacheService');
 const logger = require('../config/logger');
 const { subDays, format } = require('date-fns');
 
@@ -12,6 +13,9 @@ const { subDays, format } = require('date-fns');
 const createMoodEntry = async (req, res, next) => {
   try {
     const entry = await MoodEntry.create(req.user.userId, req.body);
+
+    cache.short.delByUser(req.user.userId);
+    cache.long.delByUser(req.user.userId);
 
     logger.info('Mood entry created', { userId: req.user.userId, entryId: entry.entry_id });
 

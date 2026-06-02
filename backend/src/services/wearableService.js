@@ -1,6 +1,7 @@
 const WearableConnection = require('../models/WearableConnection');
 const { getMockProvider, shouldUseMock } = require('./mockWearableProviders');
 const logger = require('../config/logger');
+const cache = require('./cacheService');
 
 /**
  * Wearable Service
@@ -339,6 +340,12 @@ class WearableService {
       endDate = new Date().toISOString().split('T')[0]
     } = options;
 
+    return cache.wrap(cache.short, cache.key('biometricSummary', userId, startDate, endDate), () =>
+      this._getBiometricSummaryUncached(userId, startDate, endDate)
+    );
+  }
+
+  static async _getBiometricSummaryUncached(userId, startDate, endDate) {
     const summary = await WearableConnection.getBiometricSummary(userId, { startDate, endDate });
 
     // Format summary with readable labels

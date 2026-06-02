@@ -1,6 +1,7 @@
 const db = require('../config/database');
 const { v4: uuidv4 } = require('uuid');
 const { encrypt, decrypt } = require('../utils/encryption');
+const cache = require('../services/cacheService');
 
 class MoodEntry {
   /**
@@ -212,6 +213,12 @@ class MoodEntry {
    * Get mood statistics for time period
    */
   static async getStatistics(userId, { startDate, endDate }) {
+    return cache.wrap(cache.short, cache.key('stats', userId, startDate, endDate), () =>
+      this._getStatisticsUncached(userId, { startDate, endDate })
+    );
+  }
+
+  static async _getStatisticsUncached(userId, { startDate, endDate }) {
     const query = `
       SELECT
         COUNT(*) as total_entries,
@@ -240,6 +247,12 @@ class MoodEntry {
    * Get mood trends over time
    */
   static async getTrends(userId, { startDate, endDate, groupBy = 'week' }) {
+    return cache.wrap(cache.short, cache.key('trends', userId, startDate, endDate, groupBy), () =>
+      this._getTrendsUncached(userId, { startDate, endDate, groupBy })
+    );
+  }
+
+  static async _getTrendsUncached(userId, { startDate, endDate, groupBy = 'week' }) {
     const dateFormat = groupBy === 'day' ? 'YYYY-MM-DD' :
                        groupBy === 'week' ? 'IYYY-IW' :
                        'YYYY-MM';

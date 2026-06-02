@@ -8,18 +8,22 @@ Version 2.0.0 · MIT licensed · UK GDPR & Data Protection Act 2018 compliant ·
 
 ## Screenshots
 
-> _Add screenshots of the running application here. Suggested captures:_
-> - `docs/screenshots/dashboard.png` — fleet/mood overview dashboard
-> - `docs/screenshots/mood-entry.png` — multi-dimensional mood entry
-> - `docs/screenshots/luna-chatbot.png` — Luna therapeutic chatbot conversation
-> - `docs/screenshots/insights.png` — AI-generated insights and trends
-> - `docs/screenshots/crisis-resources.png` — crisis-resource integration
+The screenshots below are captured automatically by `frontend/scripts/capture-screenshots.js` (Playwright) against a backend seeded by `node backend/scripts/seed-demo-data.js`. To refresh after a UI change: `cd frontend && npm run screenshots`.
 
-```
+### Dashboard
 ![Dashboard](docs/screenshots/dashboard.png)
-![Luna chatbot](docs/screenshots/luna-chatbot.png)
+
+### Mood entry
+![Mood entry](docs/screenshots/mood-entry.png)
+
+### Insights and trends
 ![Insights](docs/screenshots/insights.png)
-```
+
+### Luna therapeutic chatbot
+![Luna chatbot](docs/screenshots/luna-chatbot.png)
+
+### UK crisis resources
+![Crisis resources](docs/screenshots/crisis-resources.png)
 
 ---
 

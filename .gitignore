@@ -9,6 +9,14 @@ node_modules/
 # Personal files
 my_CV/
 
+# Visa-application internals (NEVER commit — see HANDOVER_PENDING_FEATURES.md)
+Mental_Health_Tracker_Technical_Evidence_OC1_OC3.md
+
+# Jest coverage reports
+coverage/
+backend/coverage/
+frontend/coverage/
+
 # Binary documents (keep .md docs, exclude .docx)
 *.docx
 

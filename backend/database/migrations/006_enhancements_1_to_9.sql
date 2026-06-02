@@ -302,7 +302,7 @@ CREATE TABLE IF NOT EXISTS peer_pattern_profiles (
 
 CREATE TABLE IF NOT EXISTS peer_structured_exercises (
     exercise_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    group_id UUID NOT NULL REFERENCES peer_groups(group_id) ON DELETE CASCADE,
+    group_id UUID NOT NULL REFERENCES peer_support_groups(group_id) ON DELETE CASCADE,
     exercise_type VARCHAR(30) NOT NULL,
     title VARCHAR(100) NOT NULL,
     description TEXT,

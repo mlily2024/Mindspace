@@ -46,7 +46,8 @@ The system serves four primary user groups — students, professionals, parents 
 
 ### Luna 2.0 — therapeutic chatbot
 - Conversational support grounded in **CBT and ACT therapeutic techniques**
-- **Crisis detection** with keyword screening and escalation to crisis resources
+- **Pluggable response engine** — defaults to the offline, zero-cost template engine; deployments can opt in to a **Claude-backed LLM** (per-user `llm_opted_in` toggle, GDPR-conscious) for richer responses. Crisis content is filtered before any LLM call, so safety never depends on a third-party service. See [ADR-0001](docs/adr/0001-llm-provider-abstraction-and-safety-boundary.md).
+- **UK-localised crisis detection** with keyword screening and direct escalation to UK helplines (Samaritans 116 123, Shout, NHS 111, Papyrus, 999). See [ADR-0003](docs/adr/0003-uk-localised-crisis-content.md).
 - **Emotional-granularity training** — helps users refine broad emotions into specific ones
 - Longitudinal conversation memory and data-informed responses
 
@@ -62,6 +63,10 @@ The system serves four primary user groups — students, professionals, parents 
 ### Safety & crisis support
 - **Real-time risk detection** with severity tiers (low / moderate / high / critical)
 - **UK-specific crisis resources** integrated and always accessible (see below)
+
+### Notifications
+- **Real-time in-app notifications** via Socket.io for online users (instant, no permission prompt)
+- **Browser push notifications** via Web Push (VAPID) for users with the tab closed — opt-in only, per-browser; safety alerts, insights, peer messages and streak updates delivered to the OS notification tray. Stale endpoints auto-prune; per-subscription failures are isolated. See [ADR-0002](docs/adr/0002-web-push-as-additive-delivery-channel.md).
 
 ### Privacy, security & accessibility
 - **AES-256-GCM authenticated encryption** for sensitive data (per-record unique IV + auth-tag tamper detection)
@@ -258,6 +263,46 @@ Integrated and always accessible within the app:
 - **PAPYRUS (under-35s):** 0800 068 4141
 
 ---
+
+## Optional features setup
+
+Both LLM-backed Luna and browser push notifications are **off by default** and require a small one-time setup to enable.
+
+### LLM-backed Luna (Anthropic Claude)
+Generate or supply an Anthropic API key, then add to `backend/.env`:
+```
+LUNA_PROVIDER=anthropic
+ANTHROPIC_API_KEY=sk-ant-...
+```
+Defaults (all env-overridable in `backend/.env.example`): Claude Haiku 4.5, 30 calls/user/day, 5M tokens/month cap, 5-failure circuit breaker. Users still need `llm_opted_in: true` on their `luna_profiles` row to receive LLM responses.
+
+### Browser push notifications (Web Push)
+```bash
+# Generate VAPID keys ONCE per deployment
+node backend/scripts/generate-vapid.js
+# Paste the printed values into backend/.env:
+#   VAPID_PUBLIC_KEY=...
+#   VAPID_PRIVATE_KEY=...
+#   VAPID_SUBJECT=mailto:you@example.com
+
+# Apply the push_subscriptions migration (cross-platform, no psql needed)
+node backend/scripts/run-migration.js backend/database/migrations/007_add_push_subscriptions.sql
+```
+Users then opt in individually via Settings → Preferences → "Enable push notifications".
+
+End-to-end test:
+```bash
+node backend/scripts/send-test-push.js              # list subscribed users
+node backend/scripts/send-test-push.js <userId>     # send a real notification
+```
+
+## Architecture decision records
+
+Notable architectural decisions are documented in `docs/adr/`:
+
+- [ADR-0001 — LLM provider abstraction and safety boundary](docs/adr/0001-llm-provider-abstraction-and-safety-boundary.md)
+- [ADR-0002 — Web Push as an additive delivery channel](docs/adr/0002-web-push-as-additive-delivery-channel.md)
+- [ADR-0003 — UK localisation of crisis content (SafetyFilter)](docs/adr/0003-uk-localised-crisis-content.md)
 
 ## Testing
 

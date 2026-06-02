@@ -38,35 +38,26 @@ const encrypt = (data) => {
 };
 
 /**
- * Decrypt sensitive data encrypted with AES-256-GCM
- * Also supports legacy CryptoJS-encrypted data for backwards compatibility
+ * Decrypt sensitive data encrypted with AES-256-GCM.
+ * Expects iv:authTag:ciphertext (all base64). Any other format throws.
  * @param {string} encryptedData - Encrypted data
  * @returns {any} Decrypted data
  */
 const decrypt = (encryptedData) => {
   if (!encryptedData) return null;
   try {
-    // New format: iv:authTag:ciphertext
     const parts = encryptedData.split(':');
-    if (parts.length === 3) {
-      const iv = Buffer.from(parts[0], 'base64');
-      const authTag = Buffer.from(parts[1], 'base64');
-      const ciphertext = parts[2];
-      const decipher = crypto.createDecipheriv('aes-256-gcm', KEY, iv);
-      decipher.setAuthTag(authTag);
-      let decrypted = decipher.update(ciphertext, 'base64', 'utf8');
-      decrypted += decipher.final('utf8');
-      return JSON.parse(decrypted);
+    if (parts.length !== 3) {
+      throw new Error('Unsupported encryption format (expected iv:authTag:ciphertext)');
     }
-    // Legacy CryptoJS format fallback — attempt to decrypt old data
-    // CryptoJS AES output is a single base64 string (no colons)
-    try {
-      const CryptoJS = require('crypto-js');
-      const bytes = CryptoJS.AES.decrypt(encryptedData, ENCRYPTION_KEY);
-      return JSON.parse(bytes.toString(CryptoJS.enc.Utf8));
-    } catch (legacyError) {
-      throw new Error('Unable to decrypt data (unsupported format)');
-    }
+    const iv = Buffer.from(parts[0], 'base64');
+    const authTag = Buffer.from(parts[1], 'base64');
+    const ciphertext = parts[2];
+    const decipher = crypto.createDecipheriv('aes-256-gcm', KEY, iv);
+    decipher.setAuthTag(authTag);
+    let decrypted = decipher.update(ciphertext, 'base64', 'utf8');
+    decrypted += decipher.final('utf8');
+    return JSON.parse(decrypted);
   } catch (error) {
     console.error('Decryption error:', error.message);
     throw new Error('Failed to decrypt data');

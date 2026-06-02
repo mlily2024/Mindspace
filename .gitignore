@@ -45,3 +45,5 @@ build/
 # Database files
 *.db
 *.sqlite
+.local-backups/
+backend/.local-backups/

@@ -75,6 +75,13 @@ describe('Encryption Utility', () => {
     it('should throw on completely invalid input', () => {
       expect(() => decrypt('not-valid-encrypted-data')).toThrow();
     });
+
+    it('should throw on legacy CryptoJS-format input (no colons)', () => {
+      // Legacy CryptoJS output is a single base64 blob — must now throw
+      // since the fallback path has been removed.
+      const legacyShape = 'U2FsdGVkX1+abcdefghijklmnopqrstuvwxyz0123456789+/=';
+      expect(() => decrypt(legacyShape)).toThrow();
+    });
   });
 
   describe('hash()', () => {

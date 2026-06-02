@@ -52,6 +52,7 @@ The system serves four primary user groups — students, professionals, parents 
 - Conversational support grounded in **CBT and ACT therapeutic techniques**
 - **Pluggable response engine** — defaults to the offline, zero-cost template engine; deployments can opt in to a **Claude-backed LLM** (per-user `llm_opted_in` toggle, GDPR-conscious) for richer responses. Crisis content is filtered before any LLM call, so safety never depends on a third-party service. See [ADR-0001](docs/adr/0001-llm-provider-abstraction-and-safety-boundary.md).
 - **UK-localised crisis detection** with keyword screening and direct escalation to UK helplines (Samaritans 116 123, Shout, NHS 111, Papyrus, 999). See [ADR-0003](docs/adr/0003-uk-localised-crisis-content.md).
+- **Tamper-evident AI audit log** — every Luna interaction (rule-based, LLM, or crisis-filter response) appends a privacy-preserving record (SHA-256 fingerprints, no plaintext) to a per-user hash chain. Append-only at the DB layer; `verifyChain(userId)` detects any after-the-fact mutation of either content or sequence. See [ADR-0004](docs/adr/0004-hash-chained-ai-audit-log.md).
 - **Emotional-granularity training** — helps users refine broad emotions into specific ones
 - Longitudinal conversation memory and data-informed responses
 

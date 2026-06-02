@@ -11,6 +11,7 @@ const logger = require('../config/logger');
 const safetyFilter = require('./safetyFilter');
 const responseGeneratorFactory = require('./responseGeneratorFactory');
 const RuleBasedResponseGenerator = require('./ruleBasedResponseGenerator');
+const aiAudit = require('./aiAuditService');
 
 // ─── Keyword dictionaries ─────────────────────────────────────────────────────
 // NOTE: Crisis keywords now live in safetyFilter (UK_CRISIS_KEYWORDS).
@@ -677,8 +678,19 @@ class LunaService {
       const crisisDetected = this._detectCrisis(lowerMsg);
       if (crisisDetected) {
         await this.addJournalEntry(userId, 'concern', 'Crisis language detected in conversation', sessionId);
+        const crisisResponse = safetyFilter.buildResponse();
+        aiAudit.safeAppend({
+          userId,
+          conversationId: sessionId,
+          provider: 'crisis_filter',
+          userMessage: message,
+          modelResponse: crisisResponse,
+          safetyVerdict: { crisisDetected: true },
+          outputClassification: 'crisis_response',
+          latencyMs: 0
+        });
         return {
-          response: safetyFilter.buildResponse(),
+          response: crisisResponse,
           suggestedTechnique: null,
           moodDetected: 'crisis',
           crisisDetected: true,
@@ -728,9 +740,12 @@ class LunaService {
         ? responseGeneratorFactory.getProvider()
         : new RuleBasedResponseGenerator();
       let response;
+      let usedFallback = false;
+      const auditStart = Date.now();
       try {
         response = await provider.generate(providerInput);
       } catch (providerError) {
+        usedFallback = true;
         logger.warn('Luna response provider failed; falling back to rule_based', {
           provider: provider.name,
           error: providerError.message,
@@ -740,6 +755,22 @@ class LunaService {
         const fallback = new RuleBasedResponseGenerator();
         response = await fallback.generate(providerInput);
       }
+      const auditLatencyMs = Date.now() - auditStart;
+      aiAudit.safeAppend({
+        userId,
+        conversationId: sessionId,
+        provider: usedFallback ? 'rule_based' : provider.name,
+        modelVersion: (!usedFallback && provider.name === 'anthropic')
+          ? (process.env.LUNA_LLM_MODEL || 'claude-haiku-4-5-20251001')
+          : null,
+        userMessage: message,
+        modelResponse: response,
+        safetyVerdict: { crisisDetected: false },
+        outputClassification: usedFallback
+          ? 'fallback'
+          : (provider.name === 'anthropic' ? 'llm' : 'rule_based'),
+        latencyMs: auditLatencyMs
+      });
 
       // 7. Log theme (best-effort — must never block the response).
       if (theme) {

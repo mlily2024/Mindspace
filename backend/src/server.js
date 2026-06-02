@@ -39,6 +39,8 @@ const enhancedPeerRoutes = require('./routes/enhancedPeerRoutes');
 const clinicianReportRoutes = require('./routes/clinicianReportRoutes');
 // Web Push (Stage D)
 const pushRoutes = require('./routes/pushRoutes');
+// Differential-privacy cohort aggregates (ADR-0005)
+const cohortInsightsRoutes = require('./routes/cohortInsightsRoutes');
 
 // Initialize Express app
 const app = express();
@@ -156,6 +158,7 @@ app.use('/api/assessments', assessmentRoutes);
 app.use('/api/peer-support/enhanced', enhancedPeerRoutes);
 app.use('/api/clinician-reports', clinicianReportRoutes);
 app.use('/api/push', pushRoutes);
+app.use('/api/cohort-insights', cohortInsightsRoutes);
 
 // 404 handler
 app.use(notFound);

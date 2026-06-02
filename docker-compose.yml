@@ -5,8 +5,12 @@
 #   2. docker compose up --build
 #   3. Frontend: http://localhost:3000   Backend: http://localhost:5000
 #
-# The PostgreSQL schema is initialised automatically from database/schema.sql
-# on first run (empty volume). Use `docker compose down -v` to reset the DB.
+# The PostgreSQL schema AND all migrations 001-008 are auto-applied on
+# first boot by scripts/docker-db-init.sh (mounted into postgres's
+# /docker-entrypoint-initdb.d/). Use `docker compose down -v` to reset.
+#
+# Optional features (LLM Luna, Web Push) are enabled by setting the
+# corresponding env vars in your .env file — see .env.docker.example.
 
 services:
   db:
@@ -18,7 +22,12 @@ services:
       POSTGRES_PASSWORD: ${DB_PASSWORD:-postgres}
     volumes:
       - pgdata:/var/lib/postgresql/data
-      - ./database/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
+      # The init.sh runs schema.sql + every migration in order on first
+      # boot. /db-init/ is read by the script; the .sh in initdb.d is
+      # what postgres actually executes.
+      - ./scripts/docker-db-init.sh:/docker-entrypoint-initdb.d/00-init.sh:ro
+      - ./backend/database/schema.sql:/db-init/schema.sql:ro
+      - ./backend/database/migrations:/db-init/migrations:ro
     ports:
       - "5432:5432"
     healthcheck:
@@ -45,6 +54,13 @@ services:
       RATE_LIMIT_WINDOW_MS: ${RATE_LIMIT_WINDOW_MS:-900000}
       RATE_LIMIT_MAX_REQUESTS: ${RATE_LIMIT_MAX_REQUESTS:-100}
       ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-http://localhost:3000}
+      # Optional: LLM-backed Luna (default OFF — falls back to rule-based)
+      LUNA_PROVIDER: ${LUNA_PROVIDER:-rule_based}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      # Optional: Web Push notifications (default OFF — Socket.io still works)
+      VAPID_PUBLIC_KEY: ${VAPID_PUBLIC_KEY:-}
+      VAPID_PRIVATE_KEY: ${VAPID_PRIVATE_KEY:-}
+      VAPID_SUBJECT: ${VAPID_SUBJECT:-mailto:noreply@mindspace.local}
     ports:
       - "5000:5000"
     depends_on:

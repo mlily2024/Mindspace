@@ -12,6 +12,11 @@ my_CV/
 # Visa-application internals (NEVER commit — see HANDOVER_PENDING_FEATURES.md)
 Mental_Health_Tracker_Technical_Evidence_OC1_OC3.md
 
+# Handover / project-summary documents — kept LOCAL only, not on the public repo.
+# The public-facing description lives in README.md + docs/adr/.
+HANDOVER_DOCUMENT.md
+PROJECT_SUMMARY.md
+
 # Jest coverage reports
 coverage/
 backend/coverage/

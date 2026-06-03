@@ -50,11 +50,11 @@ The system serves four primary user groups — students, professionals, parents 
 
 ### Luna 2.0 — therapeutic chatbot
 - Conversational support grounded in **CBT and ACT therapeutic techniques**
-- **Pluggable response engine** — defaults to the offline, zero-cost template engine; deployments can opt in to a **Claude-backed LLM** (per-user `llm_opted_in` toggle, GDPR-conscious) for richer responses. Crisis content is filtered before any LLM call, so safety never depends on a third-party service. See [ADR-0001](docs/adr/0001-llm-provider-abstraction-and-safety-boundary.md).
-- **UK-localised crisis detection** with keyword screening and direct escalation to UK helplines (Samaritans 116 123, Shout, NHS 111, Papyrus, 999). See [ADR-0003](docs/adr/0003-uk-localised-crisis-content.md).
-- **Tamper-evident AI audit log** — every Luna interaction (rule-based, LLM, or crisis-filter response) appends a privacy-preserving record (SHA-256 fingerprints, no plaintext) to a per-user hash chain. Append-only at the DB layer; `verifyChain(userId)` detects any after-the-fact mutation of either content or sequence. See [ADR-0004](docs/adr/0004-hash-chained-ai-audit-log.md).
-- **ε-differentially private cohort aggregates** — any cross-user statistic (e.g. average mood by day-of-week) is released through a Laplace mechanism with a tracked per-scope privacy budget, cryptographic randomness, and small-cell suppression. The first endpoint is `GET /api/cohort-insights/mood-by-day-of-week`. See [ADR-0005](docs/adr/0005-differential-privacy-cohort-insights.md).
-- **On-device sentiment analysis for journal text** — sentiment classification runs entirely in the user's browser via Transformers.js (DistilBERT int8, ~67 MB cached after first load). Only the derived score, label, confidence, model id, character count, and a SHA-256 of the text are sent to the server — **plaintext never leaves the device**. New endpoint `POST /api/mood-sentiments`. See [ADR-0006](docs/adr/0006-on-device-sentiment-analysis.md).
+- **Pluggable response engine** — defaults to the offline, zero-cost template engine; deployments can opt in to a **Claude-backed LLM** (per-user `llm_opted_in` toggle, GDPR-conscious) for richer responses. Crisis content is filtered before any LLM call, so safety never depends on a third-party service.
+- **UK-localised crisis detection** with keyword screening and direct escalation to UK helplines (Samaritans 116 123, Shout, NHS 111, Papyrus, 999).
+- **Tamper-evident AI audit log** — every Luna interaction (rule-based, LLM, or crisis-filter response) appends a privacy-preserving record (SHA-256 fingerprints, no plaintext) to a per-user hash chain. Append-only at the DB layer; `verifyChain(userId)` detects any after-the-fact mutation of either content or sequence.
+- **ε-differentially private cohort aggregates** — any cross-user statistic (e.g. average mood by day-of-week) is released through a Laplace mechanism with a tracked per-scope privacy budget, cryptographic randomness, and small-cell suppression. The first endpoint is `GET /api/cohort-insights/mood-by-day-of-week`.
+- **On-device sentiment analysis for journal text** — sentiment classification runs entirely in the user's browser via Transformers.js (DistilBERT int8, ~67 MB cached after first load). Only the derived score, label, confidence, model id, character count, and a SHA-256 of the text are sent to the server — **plaintext never leaves the device**. New endpoint `POST /api/mood-sentiments`.
 - **Emotional-granularity training** — helps users refine broad emotions into specific ones
 - Longitudinal conversation memory and data-informed responses
 
@@ -73,7 +73,7 @@ The system serves four primary user groups — students, professionals, parents 
 
 ### Notifications
 - **Real-time in-app notifications** via Socket.io for online users (instant, no permission prompt)
-- **Browser push notifications** via Web Push (VAPID) for users with the tab closed — opt-in only, per-browser; safety alerts, insights, peer messages and streak updates delivered to the OS notification tray. Stale endpoints auto-prune; per-subscription failures are isolated. See [ADR-0002](docs/adr/0002-web-push-as-additive-delivery-channel.md).
+- **Browser push notifications** via Web Push (VAPID) for users with the tab closed — opt-in only, per-browser; safety alerts, insights, peer messages and streak updates delivered to the OS notification tray. Stale endpoints auto-prune; per-subscription failures are isolated.
 
 ### Privacy, security & accessibility
 - **AES-256-GCM authenticated encryption** for sensitive data (per-record unique IV + auth-tag tamper detection)
@@ -211,8 +211,6 @@ The backend exposes a RESTful API under `/api`, including:
 | Clinician reports | `/api/clinician-reports` |
 | Admin | `/api/admin` |
 
-Full endpoint documentation: see `docs/API_DOCUMENTATION.md`.
-
 ---
 
 ## Project structure
@@ -302,14 +300,6 @@ End-to-end test:
 node backend/scripts/send-test-push.js              # list subscribed users
 node backend/scripts/send-test-push.js <userId>     # send a real notification
 ```
-
-## Architecture decision records
-
-Notable architectural decisions are documented in `docs/adr/`:
-
-- [ADR-0001 — LLM provider abstraction and safety boundary](docs/adr/0001-llm-provider-abstraction-and-safety-boundary.md)
-- [ADR-0002 — Web Push as an additive delivery channel](docs/adr/0002-web-push-as-additive-delivery-channel.md)
-- [ADR-0003 — UK localisation of crisis content (SafetyFilter)](docs/adr/0003-uk-localised-crisis-content.md)
 
 ## Testing
 

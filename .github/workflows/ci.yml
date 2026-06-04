@@ -1,0 +1,147 @@
+name: CI
+
+# Runs on every push to main and on every pull request targeting main.
+# Two jobs:
+#   - backend: Jest suite + ESLint, with a Postgres 14 service container so
+#     the tests that hit a real DB (aiAuditService, cohortInsightsService,
+#     pushController) can run. Migrations applied before tests.
+#   - frontend: ESLint + Vite build.
+# Both jobs run in parallel; CI passes only if both succeed.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  backend:
+    name: Backend (tests + lint)
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:14
+        env:
+          POSTGRES_USER: mindspace_test
+          POSTGRES_PASSWORD: mindspace_test_password
+          POSTGRES_DB: mindspace_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U mindspace_test"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      NODE_ENV: test
+      DB_HOST: localhost
+      DB_PORT: 5432
+      DB_NAME: mindspace_test
+      DB_USER: mindspace_test
+      DB_PASSWORD: mindspace_test_password
+      JWT_SECRET: ci_jwt_secret_at_least_thirty_two_characters_long_for_test_runs_only
+      JWT_EXPIRE: 4h
+      ENCRYPTION_KEY: ci_encryption_key_thirty_two_characters_long_test_only
+      ADMIN_PASSWORD: ci_admin_password_only_for_test_environment
+      RATE_LIMIT_WINDOW_MS: 900000
+      RATE_LIMIT_MAX_REQUESTS: 1000
+      ALLOWED_ORIGINS: http://localhost:3000
+
+    defaults:
+      run:
+        working-directory: backend
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+
+      - name: Install backend dependencies
+        run: npm ci
+
+      - name: Wait for Postgres
+        run: |
+          for i in {1..30}; do
+            if pg_isready -h localhost -U mindspace_test -d mindspace_test; then
+              echo "Postgres ready after $i attempts"
+              exit 0
+            fi
+            echo "Waiting for Postgres ($i/30)..."
+            sleep 2
+          done
+          echo "Postgres did not become ready"
+          exit 1
+
+      - name: Apply database schema
+        run: |
+          PGPASSWORD=$DB_PASSWORD psql -h $DB_HOST -U $DB_USER -d $DB_NAME -f database/schema.sql
+        # If schema.sql lives at ../database/schema.sql relative to backend/, adjust the path.
+
+      - name: Apply numbered migrations
+        run: |
+          for migration in database/migrations/*.sql; do
+            if [ -f "$migration" ]; then
+              echo "Applying $migration"
+              PGPASSWORD=$DB_PASSWORD psql -h $DB_HOST -U $DB_USER -d $DB_NAME -f "$migration"
+            fi
+          done
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Test (with coverage)
+        run: npm test -- --ci --reporters=default --coverage
+
+      - name: Upload coverage artefact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-coverage
+          path: backend/coverage/
+          if-no-files-found: ignore
+
+  frontend:
+    name: Frontend (lint + build)
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: frontend
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install frontend dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Build (Vite production bundle)
+        env:
+          VITE_API_BASE_URL: http://localhost:5000/api
+        run: npm run build
+
+      - name: Upload build artefact
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-dist
+          path: frontend/dist/
+          if-no-files-found: ignore

@@ -1,0 +1,152 @@
+# Render Blueprint for the Mindspace demo deployment.
+#
+# Usage (one-time setup):
+#   1. Sign in at https://dashboard.render.com (or sign up with GitHub).
+#   2. New + → Blueprint → connect this repo → select this file.
+#   3. Render provisions the three services + database below automatically.
+#   4. Set the manual env-vars listed under each service (the ones marked
+#      `sync: false` — these need values you supply, not values Render
+#      generates or pulls from another service).
+#   5. First deploy will run `bootstrap-render-db.js` (preDeployCommand)
+#      to apply schema + migrations, then start the backend.
+#   6. After the first successful deploy, run the demo seed once via the
+#      Render shell on the backend service:
+#        node backend/scripts/seed-demo-data.js
+#      (subsequent nightly seeds run via the cron job below)
+#
+# Demo URL pattern (Render auto-assigns):
+#   https://mindspace-demo.onrender.com       (static frontend)
+#   https://mindspace-demo-api.onrender.com   (backend)
+#
+# Demo credentials (defined in backend/scripts/seed-demo-data.js):
+#   email:    demo@mindspace.local
+#   password: DemoMindspace!2026
+
+databases:
+  - name: mindspace-demo-db
+    plan: free
+    region: oregon
+    postgresMajorVersion: 16
+
+services:
+  # ---------------------------------------------------------------------
+  # Backend API — Node/Express in Docker, identical to local docker-compose
+  # ---------------------------------------------------------------------
+  - type: web
+    name: mindspace-demo-api
+    runtime: docker
+    plan: free
+    region: oregon
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: ./backend
+    healthCheckPath: /health
+    preDeployCommand: node scripts/bootstrap-render-db.js
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 5000
+      # Database connection — Render injects DATABASE_URL automatically
+      # when the service is linked to a managed Postgres. The backend code
+      # also accepts the split DB_* variables; both forms work.
+      - key: DATABASE_URL
+        fromDatabase:
+          name: mindspace-demo-db
+          property: connectionString
+      - key: DB_HOST
+        fromDatabase:
+          name: mindspace-demo-db
+          property: host
+      - key: DB_PORT
+        fromDatabase:
+          name: mindspace-demo-db
+          property: port
+      - key: DB_NAME
+        fromDatabase:
+          name: mindspace-demo-db
+          property: database
+      - key: DB_USER
+        fromDatabase:
+          name: mindspace-demo-db
+          property: user
+      - key: DB_PASSWORD
+        fromDatabase:
+          name: mindspace-demo-db
+          property: password
+      # Secrets — Render generates random values on first deploy.
+      # The demo doesn't share secrets with the local dev environment.
+      - key: JWT_SECRET
+        generateValue: true
+      - key: ENCRYPTION_KEY
+        generateValue: true
+      - key: ADMIN_PASSWORD
+        generateValue: true
+      - key: JWT_EXPIRE
+        value: 4h
+      - key: ALLOWED_ORIGINS
+        value: https://mindspace-demo.onrender.com
+      - key: RATE_LIMIT_WINDOW_MS
+        value: "900000"
+      - key: RATE_LIMIT_MAX_REQUESTS
+        value: "100"
+      - key: LUNA_PROVIDER
+        value: rule_based
+      # Optional integrations — leave empty (off) for the demo
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: VAPID_PUBLIC_KEY
+        sync: false
+      - key: VAPID_PRIVATE_KEY
+        sync: false
+      - key: VAPID_SUBJECT
+        value: mailto:noreply@mindspace-demo.local
+
+  # ---------------------------------------------------------------------
+  # Frontend — Vite static build
+  # ---------------------------------------------------------------------
+  - type: web
+    name: mindspace-demo
+    runtime: static
+    plan: free
+    buildCommand: cd frontend && npm install && npm run build
+    staticPublishPath: ./frontend/dist
+    envVars:
+      # Build-time env var (Vite bakes this into the bundle)
+      - key: VITE_API_BASE_URL
+        value: https://mindspace-demo-api.onrender.com/api
+    # SPA routing — every URL rewrites to index.html so React Router works
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
+    # Light security headers for the demo
+    headers:
+      - path: /*
+        name: X-Frame-Options
+        value: DENY
+      - path: /*
+        name: X-Content-Type-Options
+        value: nosniff
+      - path: /*
+        name: Referrer-Policy
+        value: strict-origin-when-cross-origin
+
+  # ---------------------------------------------------------------------
+  # Nightly cron — wipes user-created accounts + re-seeds the demo data
+  # ---------------------------------------------------------------------
+  - type: cron
+    name: mindspace-demo-reset
+    runtime: docker
+    plan: free
+    region: oregon
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: ./backend
+    schedule: "0 3 * * *"   # 03:00 UTC every day
+    dockerCommand: node scripts/reset-demo.js
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: mindspace-demo-db
+          property: connectionString
+      - key: API_BASE_URL
+        value: https://mindspace-demo-api.onrender.com/api

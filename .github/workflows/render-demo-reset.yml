@@ -1,0 +1,74 @@
+name: Render demo nightly reset
+
+# Free-tier-friendly substitute for Render's $1/month cron service.
+# Runs nightly at 03:00 UTC; connects to the Render-hosted Postgres,
+# wipes user-created accounts, clears the demo user's mood entries +
+# sentiments, and re-seeds via the existing backend/scripts/reset-demo.js
+# script (which spawns seed-demo-data.js to re-create the 7-day window).
+#
+# Free on public repos (Mindspace is MIT and public). Free on private
+# repos up to 2000 minutes/month — this job runs ~2 min/day = ~60 min/month.
+#
+# Required repository secrets (set in repo → Settings → Secrets & variables
+# → Actions → Repository secrets):
+#   RENDER_DATABASE_URL   — Postgres connection string of the Render demo
+#                           database (Render dashboard → mindspace-demo-db →
+#                           Connection → "External Database URL"). Includes
+#                           the SSL=require flag; reset-demo.js handles SSL.
+#   RENDER_API_BASE       — Public API URL of the Render demo backend,
+#                           e.g. https://mindspace-demo-api.onrender.com/api
+#                           (note the trailing /api).
+#
+# Manual trigger:
+#   GitHub Actions tab → Render demo nightly reset → Run workflow.
+
+on:
+  schedule:
+    - cron: "0 3 * * *"
+  workflow_dispatch:
+
+jobs:
+  reset:
+    name: Reset demo data
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    # Skip the run if the required secrets aren't configured yet
+    # (e.g. before you've finished the one-time Render setup).
+    if: ${{ vars.RENDER_DEMO_ENABLED != 'false' }}
+
+    env:
+      DATABASE_URL: ${{ secrets.RENDER_DATABASE_URL }}
+      API_BASE_URL: ${{ secrets.RENDER_API_BASE }}
+
+    steps:
+      - name: Check secrets are present
+        run: |
+          if [ -z "$DATABASE_URL" ]; then
+            echo "::warning::RENDER_DATABASE_URL secret not set; skipping reset"
+            exit 0
+          fi
+          if [ -z "$API_BASE_URL" ]; then
+            echo "::warning::RENDER_API_BASE secret not set; skipping reset"
+            exit 0
+          fi
+          echo "Both secrets present — proceeding"
+
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+
+      - name: Install backend dependencies (only what reset-demo needs)
+        working-directory: backend
+        # Production-only install — skips dev-deps to keep the job fast.
+        run: npm ci --omit=dev
+
+      - name: Run reset-demo.js
+        working-directory: backend
+        run: node scripts/reset-demo.js

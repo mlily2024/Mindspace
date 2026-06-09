@@ -1,18 +1,30 @@
-# Render Blueprint for the Mindspace demo deployment.
+# Render Blueprint for the Mindspace demo deployment (FREE TIER).
+#
+# Free-tier constraints honoured:
+#   - No `preDeployCommand` on services (not supported on free).
+#     Migrations + demo seed run MANUALLY via Render Shell after the
+#     first deploy (one-off; subsequent deploys are clean).
+#   - No Render `cron` service (not available on free).
+#     Nightly demo-data reset runs via GitHub Actions instead — see
+#     .github/workflows/render-demo-reset.yml. Free for public repos.
 #
 # Usage (one-time setup):
-#   1. Sign in at https://dashboard.render.com (or sign up with GitHub).
-#   2. New + → Blueprint → connect this repo → select this file.
-#   3. Render provisions the three services + database below automatically.
-#   4. Set the manual env-vars listed under each service (the ones marked
-#      `sync: false` — these need values you supply, not values Render
-#      generates or pulls from another service).
-#   5. First deploy will run `bootstrap-render-db.js` (preDeployCommand)
-#      to apply schema + migrations, then start the backend.
-#   6. After the first successful deploy, run the demo seed once via the
-#      Render shell on the backend service:
-#        node backend/scripts/seed-demo-data.js
-#      (subsequent nightly seeds run via the cron job below)
+#   1. Sign in at https://dashboard.render.com (sign up with GitHub).
+#   2. New + → Blueprint → connect this repo → select render.yaml.
+#   3. Render provisions the three resources below.
+#   4. After the first deploy reaches "Live": open the backend service
+#      → Shell, and run TWO commands:
+#         node scripts/bootstrap-render-db.js     # applies schema + 10 migrations
+#         node scripts/seed-demo-data.js          # creates the demo user + 7-day window
+#   5. Visit https://mindspace-demo.onrender.com — log in as
+#      demo@mindspace.local / DemoMindspace!2026.
+#
+# After this manual first-time bootstrap:
+#   - Subsequent code pushes to main auto-deploy.
+#   - bootstrap-render-db.js is idempotent (CREATE TABLE IF NOT EXISTS),
+#     so if you ever need to re-run it on a code change you can without
+#     wiping data.
+#   - The GitHub-Actions nightly cron handles demo-data reset.
 #
 # Demo URL pattern (Render auto-assigns):
 #   https://mindspace-demo.onrender.com       (static frontend)
@@ -40,7 +52,9 @@ services:
     dockerfilePath: ./backend/Dockerfile
     dockerContext: ./backend
     healthCheckPath: /health
-    preDeployCommand: node scripts/bootstrap-render-db.js
+    # NOTE: free tier does not support preDeployCommand.
+    # Run `node scripts/bootstrap-render-db.js` MANUALLY via Render Shell
+    # after the first deploy. See blueprint header comment.
     envVars:
       - key: NODE_ENV
         value: production
@@ -131,22 +145,7 @@ services:
         name: Referrer-Policy
         value: strict-origin-when-cross-origin
 
-  # ---------------------------------------------------------------------
-  # Nightly cron — wipes user-created accounts + re-seeds the demo data
-  # ---------------------------------------------------------------------
-  - type: cron
-    name: mindspace-demo-reset
-    runtime: docker
-    plan: free
-    region: oregon
-    dockerfilePath: ./backend/Dockerfile
-    dockerContext: ./backend
-    schedule: "0 3 * * *"   # 03:00 UTC every day
-    dockerCommand: node scripts/reset-demo.js
-    envVars:
-      - key: DATABASE_URL
-        fromDatabase:
-          name: mindspace-demo-db
-          property: connectionString
-      - key: API_BASE_URL
-        value: https://mindspace-demo-api.onrender.com/api
+  # NOTE: Render's `cron` service type has no free tier.
+  # The nightly demo-data reset is implemented via GitHub Actions instead —
+  # see .github/workflows/render-demo-reset.yml. Free for public repos,
+  # same 03:00 UTC schedule.

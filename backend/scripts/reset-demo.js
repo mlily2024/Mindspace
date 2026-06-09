@@ -70,13 +70,13 @@ async function wipeNonDemoUsers(pool) {
 function runSeedScript() {
   return new Promise((resolve, reject) => {
     const seedPath = path.resolve(__dirname, 'seed-demo-data.js');
+    // seed-demo-data.js reads SEED_API_BASE (default http://localhost:5000/api).
+    // We accept API_BASE_URL on the cron-job side as the friendlier name and
+    // map it through, so the Render-blueprint env value is what gets used.
+    const seedApiBase = process.env.API_BASE_URL || process.env.SEED_API_BASE || '';
     const child = spawn(process.execPath, [seedPath], {
       stdio: 'inherit',
-      env: {
-        ...process.env,
-        // seed-demo-data reads API_BASE_URL (or defaults to http://localhost:5000)
-        API_BASE_URL: process.env.API_BASE_URL || process.env.API_BASE || '',
-      },
+      env: { ...process.env, SEED_API_BASE: seedApiBase },
     });
     child.on('exit', code => {
       if (code === 0) resolve();

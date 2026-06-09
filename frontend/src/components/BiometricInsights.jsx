@@ -479,7 +479,7 @@ export const CorrelationDisplay = ({ correlations, loading }) => {
 /**
  * BiometricTrendChart - Simple trend visualization
  */
-export const BiometricTrendChart = ({ data, dataType, title }) => {
+export const BiometricTrendChart = ({ data, dataType: _dataType, title }) => {
   const containerStyle = {
     background: 'var(--surface)',
     borderRadius: 'var(--radius-xl)',

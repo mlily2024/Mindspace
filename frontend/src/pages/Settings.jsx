@@ -381,7 +381,7 @@ const PushNotificationToggle = () => {
 };
 
 // Privacy Settings Component
-const PrivacySettings = ({ user, setSuccess }) => {
+const PrivacySettings = ({ user: _user, setSuccess }) => {
   const [exportLoading, setExportLoading] = useState(false);
   const [deleteLoading, setDeleteLoading] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);

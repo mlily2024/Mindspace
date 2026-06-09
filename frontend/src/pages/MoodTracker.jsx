@@ -4,7 +4,7 @@ import Navigation from '../components/Navigation';
 import EmojiMoodPicker, { EmojiEnergyPicker, QuickMoodSlider } from '../components/EmojiMoodPicker';
 import VoiceCheckIn from '../components/VoiceCheckIn';
 import EnhancedFeedback from '../components/EnhancedFeedback';
-import MicroInterventionModal, { InterventionCard } from '../components/MicroInterventionModal';
+import MicroInterventionModal from '../components/MicroInterventionModal';
 import { moodAPI, moodSentimentsAPI } from '../services/api';
 import { SENTIMENT_OPT_IN_KEY } from './Settings';
 
@@ -16,7 +16,7 @@ const SENTIMENT_MIN_NOTES_LENGTH = 8;
 
 const MoodTracker = () => {
   const navigate = useNavigate();
-  const [step, setStep] = useState(1);
+  const [_step, _setStep] = useState(1);
   const [showDetails, setShowDetails] = useState(false);
   const [isMobile, setIsMobile] = useState(window.innerWidth <= 480);
 

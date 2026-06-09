@@ -7,7 +7,7 @@ import React from 'react';
 const EnhancedFeedback = ({ feedback, onSuggestionClick, onDismiss }) => {
   if (!feedback) return null;
 
-  const { message, comparison, suggestions, microInsight, encouragement, shouldOfferIntervention, interventionType } = feedback;
+  const { message, comparison, suggestions, microInsight, encouragement, shouldOfferIntervention: _shouldOfferIntervention, interventionType: _interventionType } = feedback;
 
   const containerStyle = {
     background: message?.color ? `linear-gradient(145deg, var(--surface), ${message.color}15)` : 'var(--surface)',

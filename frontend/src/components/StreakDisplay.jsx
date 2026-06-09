@@ -161,7 +161,7 @@ export const AchievementBadge = ({ icon, title, description, isEarned = false, e
     marginBottom: '2px'
   };
 
-  const descriptionStyle = {
+  const _descriptionStyle = {
     fontSize: '0.7rem',
     color: 'var(--text-secondary)',
     lineHeight: 1.3

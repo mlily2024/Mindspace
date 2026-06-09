@@ -156,7 +156,7 @@ const Protocols = () => {
     })
   });
 
-  const progressBarStyle = (percent) => ({
+  const progressBarStyle = (_percent) => ({
     width: '100%',
     height: '8px',
     background: '#f0ebf4',

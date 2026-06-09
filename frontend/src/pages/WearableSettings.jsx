@@ -9,7 +9,7 @@ import { useAuth } from '../context/AuthContext';
  * WearableSettings - Main page for wearable device management and biometric insights
  */
 const WearableSettings = () => {
-  const { user } = useAuth();
+  const { user: _user } = useAuth();
   const [activeTab, setActiveTab] = useState('devices');
   const [loading, setLoading] = useState(true);
   const [devices, setDevices] = useState([]);

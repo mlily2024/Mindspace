@@ -23,7 +23,7 @@ const PeerSupport = lazy(() => import('./pages/PeerSupport'));
 const AdminLogin = lazy(() => import('./pages/AdminLogin'));
 const AdminDashboard = lazy(() => import('./pages/AdminDashboard'));
 const WearableSettings = lazy(() => import('./pages/WearableSettings'));
-const Chatbot = lazy(() => import('./components/Chatbot'));
+const _Chatbot = lazy(() => import('./components/Chatbot'));
 
 // Enhancement pages (Enhancements 1-9)
 const Assessments = lazy(() => import('./pages/Assessments'));

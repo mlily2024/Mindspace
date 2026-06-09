@@ -148,6 +148,8 @@ const VoiceCheckIn = ({ onAnalysisComplete, onCancel }) => {
   };
 
   const extractAudioFeatures = async (audioBlob) => {
+    // Intentional async executor: wraps async Web Audio API calls.
+    // eslint-disable-next-line no-async-promise-executor
     return new Promise(async (resolve) => {
       // In a real implementation, we'd use the Web Audio API to extract
       // actual acoustic features. For MVP, we'll use simplified analysis.

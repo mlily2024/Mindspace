@@ -5,7 +5,7 @@ import { interventionsAPI } from '../services/api';
  * MicroInterventionModal - Full-screen intervention experience
  * Guides user through therapeutic exercises with timer and steps
  */
-const MicroInterventionModal = ({ intervention, onComplete, onSkip, onClose }) => {
+const MicroInterventionModal = ({ intervention, onComplete, onSkip, onClose: _onClose }) => {
   const [currentStep, setCurrentStep] = useState(0);
   const [timeRemaining, setTimeRemaining] = useState(intervention?.duration || 60);
   const [isRunning, setIsRunning] = useState(false);

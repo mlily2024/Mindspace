@@ -5,7 +5,7 @@ import { predictionsAPI } from '../services/api';
  * MoodForecast - Weather-style mood prediction display
  * Shows predicted mood for the next 7 days with confidence indicators
  */
-const MoodForecast = ({ onRefresh, compact = false }) => {
+const MoodForecast = ({ onRefresh: _onRefresh, compact = false }) => {
   const [forecast, setForecast] = useState(null);
   const [patterns, setPatterns] = useState(null);
   const [loading, setLoading] = useState(true);

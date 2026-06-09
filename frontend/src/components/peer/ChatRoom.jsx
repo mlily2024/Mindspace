@@ -9,7 +9,7 @@ import MessageBubble from './MessageBubble';
  * Real-time chat interface for peer support groups
  */
 const ChatRoom = ({ group, membership, onBack }) => {
-  const { socket, isConnected } = useSocket();
+  const { socket: _socket, isConnected } = useSocket();
   const [messages, setMessages] = useState([]);
   const [newMessage, setNewMessage] = useState('');
   const [isLoading, setIsLoading] = useState(true);

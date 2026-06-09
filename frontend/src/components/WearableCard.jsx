@@ -1,5 +1,4 @@
 import React, { useState } from 'react';
-import { wearablesAPI } from '../services/api';
 
 /**
  * WearableCard - Individual wearable device card for connection management

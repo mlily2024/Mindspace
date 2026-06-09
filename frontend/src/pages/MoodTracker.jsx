@@ -5,7 +5,14 @@ import EmojiMoodPicker, { EmojiEnergyPicker, QuickMoodSlider } from '../componen
 import VoiceCheckIn from '../components/VoiceCheckIn';
 import EnhancedFeedback from '../components/EnhancedFeedback';
 import MicroInterventionModal, { InterventionCard } from '../components/MicroInterventionModal';
-import { moodAPI } from '../services/api';
+import { moodAPI, moodSentimentsAPI } from '../services/api';
+import { SENTIMENT_OPT_IN_KEY } from './Settings';
+
+// Minimum notes length to bother running on-device sentiment. Shorter than
+// this and the SST-2 signal is too noisy to be useful (a 3-word fragment
+// like "ok i guess" doesn't carry enough lexical content for DistilBERT to
+// score meaningfully). Documented in ADR-0006.
+const SENTIMENT_MIN_NOTES_LENGTH = 8;
 
 const MoodTracker = () => {
   const navigate = useNavigate();
@@ -81,6 +88,40 @@ const MoodTracker = () => {
         setIntervention(response.data.intervention);
         // Show intervention after a short delay
         setTimeout(() => setShowIntervention(true), 500);
+      }
+
+      // ADR-0006: opt-in on-device sentiment. Runs strictly AFTER the
+      // mood entry succeeds and uses fire-and-forget — a failure here
+      // must never alter the user-visible save flow. The journal text
+      // never leaves this browser; only the derived score/label/hash
+      // are POSTed to /api/mood-sentiments.
+      const optedIn = (() => {
+        try { return localStorage.getItem(SENTIMENT_OPT_IN_KEY) === '1'; }
+        catch { return false; }
+      })();
+      const notes = (formData.notes || '').trim();
+      if (optedIn && notes.length >= SENTIMENT_MIN_NOTES_LENGTH) {
+        const moodEntryId = response.data?.entry?.entry_id || null;
+        // Dynamic import keeps the ~700 KB Transformers.js dep out of the
+        // MoodTracker bundle for users who have not opted in. The import
+        // only fires for opted-in users with non-trivial notes content.
+        import('../services/sentimentService')
+          .then(({ analyseOnDevice }) => analyseOnDevice(notes))
+          .then((result) => moodSentimentsAPI.create({
+            sentimentScore: result.score,
+            sentimentLabel: result.label,
+            confidence:     result.confidence,
+            modelId:        result.model_id,
+            textLength:     result.text_length,
+            textHash:       result.text_hash,
+            inferenceMs:    result.inference_ms,
+            moodEntryId
+          }))
+          .catch((err) => {
+            // Never block the user flow. Best-effort logging only.
+            // eslint-disable-next-line no-console
+            console.warn('on-device sentiment skipped:', err && err.message);
+          });
       }
 
       // Don't auto-navigate if we have feedback to show

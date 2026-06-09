@@ -4,6 +4,12 @@ import { useAuth } from '../context/AuthContext';
 import { authAPI } from '../services/api';
 import pushService from '../services/pushService';
 
+// localStorage key for the user's on-device sentiment opt-in. Single source
+// of truth — read by Settings (toggle) and MoodTracker (gate the analysis).
+// Kept here (not in sentimentService) so importing the key does not drag the
+// ~700 KB Transformers.js dependency into every consuming bundle.
+export const SENTIMENT_OPT_IN_KEY = 'mindspace.onDeviceSentiment';
+
 const Settings = () => {
   const { user, updateProfile, updatePreferences } = useAuth();
   const [activeTab, setActiveTab] = useState('profile');
@@ -480,6 +486,9 @@ const PrivacySettings = ({ user, setSuccess }) => {
         </ul>
       </div>
 
+      {/* On-device sentiment opt-in (ADR-0006) */}
+      <OnDeviceSentimentToggle />
+
       {/* Delete Account Section */}
       <div style={{
         padding: 'var(--spacing-lg)',
@@ -538,6 +547,108 @@ const PrivacySettings = ({ user, setSuccess }) => {
           </div>
         )}
       </div>
+    </div>
+  );
+};
+
+// On-device sentiment opt-in toggle (ADR-0006).
+// Lives in the Privacy tab. localStorage-backed so the choice is per-browser,
+// not synced to the server (the whole point is that the server learns nothing
+// about the user's text). On enable, primes the Transformers.js model so the
+// first real analysis in MoodTracker is fast.
+const OnDeviceSentimentToggle = () => {
+  const [enabled, setEnabled] = useState(() => {
+    try { return localStorage.getItem(SENTIMENT_OPT_IN_KEY) === '1'; }
+    catch { return false; }
+  });
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState('');
+
+  const handleEnable = async () => {
+    setBusy(true);
+    setMessage('');
+    try {
+      // Dynamic import keeps the ~700 KB Transformers.js dep out of every
+      // bundle that ships Settings — it's only loaded when the user
+      // actually clicks Enable, which aligns with ADR-0006's "lazy load
+      // on first opt-in click" principle.
+      const { getReady } = await import('../services/sentimentService');
+      await getReady();                   // downloads the ~67 MB model (cached after first time)
+      localStorage.setItem(SENTIMENT_OPT_IN_KEY, '1');
+      setEnabled(true);
+      setMessage('On-device sentiment enabled. Your journal text will be analysed on this device only — the server never receives the words you type.');
+    } catch (err) {
+      setMessage(`Could not download the sentiment model: ${err && err.message ? err.message : 'unknown error'}. The feature stays off and your journal text remains private.`);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleDisable = () => {
+    try { localStorage.setItem(SENTIMENT_OPT_IN_KEY, '0'); } catch { /* noop */ }
+    setEnabled(false);
+    setMessage('On-device sentiment disabled. No further analysis will run.');
+  };
+
+  const isError = message && /could not|fail|error/i.test(message);
+
+  return (
+    <div
+      style={{
+        marginTop: 'var(--spacing-xl)',
+        marginBottom: 'var(--spacing-xl)',
+        padding: 'var(--spacing-lg)',
+        backgroundColor: 'var(--primary-light)',
+        borderRadius: 'var(--radius-lg)',
+        borderLeft: '4px solid var(--primary-color)'
+      }}
+    >
+      <h3 style={{ marginBottom: 'var(--spacing-sm)', display: 'flex', alignItems: 'center', gap: 'var(--spacing-sm)' }}>
+        <span>🧠</span> On-device sentiment analysis
+      </h3>
+      <p style={{ color: 'var(--text-secondary)', marginBottom: 'var(--spacing-md)' }}>
+        Get a sentiment score for your journal notes without ever sending the text to a server.
+        A small language model runs entirely in your browser. Only the resulting score and label
+        leave your device — never the words themselves.
+      </p>
+      <p style={{ color: 'var(--text-tertiary)', fontSize: 'var(--font-size-small)', marginBottom: 'var(--spacing-md)' }}>
+        First-time enable downloads a ~67 MB model. After that it is cached locally and runs in under a second.
+      </p>
+
+      {!enabled && (
+        <button
+          type="button"
+          className="btn btn-primary"
+          onClick={handleEnable}
+          disabled={busy}
+        >
+          {busy ? 'Downloading model…' : 'Enable on-device sentiment'}
+        </button>
+      )}
+
+      {enabled && (
+        <button
+          type="button"
+          className="btn"
+          onClick={handleDisable}
+          disabled={busy}
+          style={{ backgroundColor: 'var(--surface)' }}
+        >
+          Disable on-device sentiment
+        </button>
+      )}
+
+      {message && (
+        <p
+          style={{
+            marginTop: 'var(--spacing-md)',
+            color: isError ? 'var(--danger-color)' : 'var(--text-secondary)',
+            fontSize: 'var(--font-size-small)'
+          }}
+        >
+          {message}
+        </p>
+      )}
     </div>
   );
 };

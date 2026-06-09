@@ -379,6 +379,17 @@ export const clinicianReportsAPI = {
 };
 
 // ============================================
+// Mood Sentiment API (ADR-0006 — on-device sentiment)
+// ============================================
+// The POST body is the OUTPUT of on-device sentiment analysis only.
+// Plaintext journal text is never sent — see frontend/src/services/sentimentService.js.
+export const moodSentimentsAPI = {
+  create:    (payload)      => api.post('/mood-sentiments', payload),
+  getRecent: (params)       => api.get('/mood-sentiments', { params }),
+  getSummary:(days)         => api.get('/mood-sentiments/summary', { params: { days } })
+};
+
+// ============================================
 // Web Push API (Stage E)
 // ============================================
 export const pushAPI = {

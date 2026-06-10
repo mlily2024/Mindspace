@@ -1,6 +1,12 @@
 # Mindspace backend — Node.js / Express API
 FROM node:20-alpine
 
+# Install psql for the bootstrap script (free-tier Render path). psql is the
+# canonical way to apply multi-statement SQL files with dollar-quoted function
+# bodies — Node's pg client.query() chokes on those in concatenated SQL.
+# Alpine package adds ~12 MB; runs as root before the USER switch below.
+RUN apk add --no-cache postgresql-client
+
 # Create app directory
 WORKDIR /app
 
@@ -26,4 +32,4 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
 # `preDeployCommand` and Shell access aren't available, so this is the only
 # path to apply migrations. Falls through harmlessly when AUTO_MIGRATE is
 # unset — local Docker Compose dev keeps the docker-db-init.sh path.
-CMD ["sh", "-c", "if [ \"$AUTO_MIGRATE\" = \"true\" ]; then node scripts/bootstrap-render-db.js || exit 1; fi; exec node src/server.js"]
+CMD ["sh", "-c", "if [ \"$AUTO_MIGRATE\" = \"true\" ]; then sh scripts/bootstrap-render-db.sh || exit 1; fi; exec node src/server.js"]

@@ -60,6 +60,12 @@ services:
         value: production
       - key: PORT
         value: 5000
+      # Free tier blocks both `preDeployCommand` AND Shell access. To still
+      # apply schema + migrations on first deploy, the Dockerfile CMD checks
+      # for this env var and runs bootstrap-render-db.js on every container
+      # startup. Bootstrap is idempotent (CREATE TABLE IF NOT EXISTS).
+      - key: AUTO_MIGRATE
+        value: "true"
       # Database connection — Render injects DATABASE_URL automatically
       # when the service is linked to a managed Postgres. The backend code
       # also accepts the split DB_* variables; both forms work.

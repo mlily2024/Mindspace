@@ -37,6 +37,17 @@ PSQL_OPTS="-v ON_ERROR_STOP=1 --quiet --set ON_ERROR_STOP=on --no-psqlrc"
 
 echo "Bootstrapping Render demo database..."
 
+# Optional one-shot full wipe: DROP SCHEMA public CASCADE then recreate.
+# Use this to recover from a partial-state DB left by an earlier failed
+# bootstrap. DESTRUCTIVE — wipes all data in the public schema. Set the
+# BOOTSTRAP_DROP_ALL env var to "true" for ONE deploy to trigger the wipe,
+# then remove the env var so subsequent deploys don't keep wiping.
+if [ "$BOOTSTRAP_DROP_ALL" = "true" ]; then
+    echo "  ⚠ BOOTSTRAP_DROP_ALL=true — wiping public schema before re-bootstrap"
+    psql $PSQL_OPTS "$DATABASE_URL" -c "DROP SCHEMA IF EXISTS public CASCADE; CREATE SCHEMA public; GRANT ALL ON SCHEMA public TO PUBLIC;" >/dev/null
+    echo "  [ok]   public schema wiped + recreated"
+fi
+
 # Schema first (creates base tables + the update_updated_at_column trigger
 # function with $$ ... $$ body that pg's Node client can't handle).
 if [ -f /app/database/schema.sql ]; then

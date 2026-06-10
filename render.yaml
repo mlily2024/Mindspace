@@ -72,15 +72,13 @@ services:
       # startup. Bootstrap is idempotent (CREATE TABLE IF NOT EXISTS).
       - key: AUTO_MIGRATE
         value: "true"
-      # ONE-SHOT WIPE: the earlier failed deploys left the schema in a
-      # partial state (users table created without all later columns), so
-      # the live backend is throwing 500 on /auth/register due to schema-
-      # vs-code mismatch. This env var tells bootstrap-render-db.sh to
-      # DROP SCHEMA public CASCADE before re-applying. DESTRUCTIVE.
-      # → REMOVE THIS BLOCK after the next deploy reaches Live, so future
-      # deploys don't keep wiping data. (Tracked: revert in follow-up commit.)
-      - key: BOOTSTRAP_DROP_ALL
-        value: "true"
+      # BOOTSTRAP_DROP_ALL was set to "true" in commits 5311fcc + c96ff4b
+      # to recover from a partial-schema state left by earlier failed
+      # deploys. After the c96ff4b deploy went Live and /auth/register
+      # started working (verified 2026-06-10), it was removed so future
+      # code deploys don't keep wiping demo data. The wipe support stays
+      # in bootstrap-render-db.sh and can be re-enabled by adding the
+      # env var back, if ever needed.
       # Database connection — Render injects DATABASE_URL automatically
       # when the service is linked to a managed Postgres. The backend code
       # also accepts the split DB_* variables; both forms work.

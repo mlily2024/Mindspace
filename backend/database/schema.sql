@@ -6,7 +6,7 @@
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
 -- Users Table (Privacy-First Design)
-CREATE TABLE users (
+CREATE TABLE IF NOT EXISTS users (
     user_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     email VARCHAR(255) UNIQUE,
     username VARCHAR(100) UNIQUE,
@@ -24,7 +24,7 @@ CREATE TABLE users (
 );
 
 -- User Preferences
-CREATE TABLE user_preferences (
+CREATE TABLE IF NOT EXISTS user_preferences (
     preference_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     user_id UUID REFERENCES users(user_id) ON DELETE CASCADE,
     language VARCHAR(10) DEFAULT 'en-GB',
@@ -39,7 +39,7 @@ CREATE TABLE user_preferences (
 );
 
 -- Mood and Wellbeing Tracking
-CREATE TABLE mood_entries (
+CREATE TABLE IF NOT EXISTS mood_entries (
     entry_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     user_id UUID REFERENCES users(user_id) ON DELETE CASCADE,
     entry_date DATE NOT NULL,
@@ -60,7 +60,7 @@ CREATE TABLE mood_entries (
 );
 
 -- Mental Health Insights (Generated Analytics)
-CREATE TABLE user_insights (
+CREATE TABLE IF NOT EXISTS user_insights (
     insight_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     user_id UUID REFERENCES users(user_id) ON DELETE CASCADE,
     insight_type VARCHAR(50) CHECK (insight_type IN ('trend', 'pattern', 'anomaly', 'improvement', 'decline', 'recommendation')),
@@ -73,7 +73,7 @@ CREATE TABLE user_insights (
 );
 
 -- Self-Care Recommendations
-CREATE TABLE recommendations (
+CREATE TABLE IF NOT EXISTS recommendations (
     recommendation_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     user_id UUID REFERENCES users(user_id) ON DELETE CASCADE,
     recommendation_type VARCHAR(50) CHECK (recommendation_type IN ('activity', 'breathing', 'exercise', 'social', 'rest', 'professional_help')),
@@ -90,7 +90,7 @@ CREATE TABLE recommendations (
 );
 
 -- User Interaction with Recommendations
-CREATE TABLE recommendation_feedback (
+CREATE TABLE IF NOT EXISTS recommendation_feedback (
     feedback_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     user_id UUID REFERENCES users(user_id) ON DELETE CASCADE,
     recommendation_id UUID REFERENCES recommendations(recommendation_id) ON DELETE CASCADE,
@@ -102,7 +102,7 @@ CREATE TABLE recommendation_feedback (
 );
 
 -- Peer Support Groups
-CREATE TABLE peer_support_groups (
+CREATE TABLE IF NOT EXISTS peer_support_groups (
     group_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     group_name VARCHAR(255) NOT NULL,
     group_type VARCHAR(50) CHECK (group_type IN ('student', 'professional', 'parent', 'elderly', 'general')),
@@ -114,7 +114,7 @@ CREATE TABLE peer_support_groups (
 );
 
 -- Peer Support Group Members
-CREATE TABLE group_members (
+CREATE TABLE IF NOT EXISTS group_members (
     membership_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     group_id UUID REFERENCES peer_support_groups(group_id) ON DELETE CASCADE,
     user_id UUID REFERENCES users(user_id) ON DELETE CASCADE,
@@ -126,7 +126,7 @@ CREATE TABLE group_members (
 );
 
 -- Peer Support Messages (Anonymous)
-CREATE TABLE peer_messages (
+CREATE TABLE IF NOT EXISTS peer_messages (
     message_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     group_id UUID REFERENCES peer_support_groups(group_id) ON DELETE CASCADE,
     user_id UUID REFERENCES users(user_id) ON DELETE CASCADE,
@@ -141,7 +141,7 @@ CREATE TABLE peer_messages (
 );
 
 -- Safety and Risk Detection
-CREATE TABLE safety_alerts (
+CREATE TABLE IF NOT EXISTS safety_alerts (
     alert_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     user_id UUID REFERENCES users(user_id) ON DELETE CASCADE,
     alert_type VARCHAR(50) CHECK (alert_type IN ('high_stress', 'mood_decline', 'crisis_indicator', 'prolonged_distress')),
@@ -154,7 +154,7 @@ CREATE TABLE safety_alerts (
 );
 
 -- Emergency Contacts (User-Controlled)
-CREATE TABLE emergency_contacts (
+CREATE TABLE IF NOT EXISTS emergency_contacts (
     contact_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     user_id UUID REFERENCES users(user_id) ON DELETE CASCADE,
     contact_name VARCHAR(255) NOT NULL,
@@ -167,7 +167,7 @@ CREATE TABLE emergency_contacts (
 );
 
 -- Data Export Requests (GDPR Compliance)
-CREATE TABLE data_export_requests (
+CREATE TABLE IF NOT EXISTS data_export_requests (
     request_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     user_id UUID REFERENCES users(user_id) ON DELETE CASCADE,
     request_type VARCHAR(50) CHECK (request_type IN ('export', 'deletion')),
@@ -178,7 +178,7 @@ CREATE TABLE data_export_requests (
 );
 
 -- Audit Log (Security & Compliance)
-CREATE TABLE audit_log (
+CREATE TABLE IF NOT EXISTS audit_log (
     log_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     user_id UUID REFERENCES users(user_id) ON DELETE SET NULL,
     action VARCHAR(100) NOT NULL,
@@ -191,12 +191,12 @@ CREATE TABLE audit_log (
 );
 
 -- Indexes for Performance
-CREATE INDEX idx_mood_entries_user_date ON mood_entries(user_id, entry_date DESC);
-CREATE INDEX idx_user_insights_user ON user_insights(user_id, generated_at DESC);
-CREATE INDEX idx_recommendations_user ON recommendations(user_id, created_at DESC);
-CREATE INDEX idx_peer_messages_group ON peer_messages(group_id, created_at DESC);
-CREATE INDEX idx_safety_alerts_user ON safety_alerts(user_id, triggered_at DESC);
-CREATE INDEX idx_audit_log_user ON audit_log(user_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_mood_entries_user_date ON mood_entries(user_id, entry_date DESC);
+CREATE INDEX IF NOT EXISTS idx_user_insights_user ON user_insights(user_id, generated_at DESC);
+CREATE INDEX IF NOT EXISTS idx_recommendations_user ON recommendations(user_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_peer_messages_group ON peer_messages(group_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_safety_alerts_user ON safety_alerts(user_id, triggered_at DESC);
+CREATE INDEX IF NOT EXISTS idx_audit_log_user ON audit_log(user_id, created_at DESC);
 
 -- Function to update updated_at timestamp
 CREATE OR REPLACE FUNCTION update_updated_at_column()
@@ -208,9 +208,11 @@ END;
 $$ language 'plpgsql';
 
 -- Triggers for updated_at
+DROP TRIGGER IF EXISTS update_users_updated_at ON users;
 CREATE TRIGGER update_users_updated_at BEFORE UPDATE ON users
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
+DROP TRIGGER IF EXISTS update_user_preferences_updated_at ON user_preferences;
 CREATE TRIGGER update_user_preferences_updated_at BEFORE UPDATE ON user_preferences
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
@@ -219,7 +221,7 @@ CREATE TRIGGER update_user_preferences_updated_at BEFORE UPDATE ON user_preferen
 -- =====================================================
 
 -- Chatbot Conversations
-CREATE TABLE chatbot_conversations (
+CREATE TABLE IF NOT EXISTS chatbot_conversations (
     conversation_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     user_id UUID REFERENCES users(user_id) ON DELETE CASCADE,
     started_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
@@ -231,7 +233,7 @@ CREATE TABLE chatbot_conversations (
 );
 
 -- Chatbot Messages
-CREATE TABLE chatbot_messages (
+CREATE TABLE IF NOT EXISTS chatbot_messages (
     message_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     conversation_id UUID REFERENCES chatbot_conversations(conversation_id) ON DELETE CASCADE,
     user_id UUID REFERENCES users(user_id) ON DELETE CASCADE,
@@ -243,15 +245,15 @@ CREATE TABLE chatbot_messages (
 );
 
 -- Index for chatbot queries
-CREATE INDEX idx_chatbot_messages_conversation ON chatbot_messages(conversation_id, created_at DESC);
-CREATE INDEX idx_chatbot_conversations_user ON chatbot_conversations(user_id, started_at DESC);
+CREATE INDEX IF NOT EXISTS idx_chatbot_messages_conversation ON chatbot_messages(conversation_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_chatbot_conversations_user ON chatbot_conversations(user_id, started_at DESC);
 
 -- =====================================================
 -- GAMIFICATION TABLES (Streaks & Achievements)
 -- =====================================================
 
 -- User Streaks
-CREATE TABLE user_streaks (
+CREATE TABLE IF NOT EXISTS user_streaks (
     streak_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     user_id UUID REFERENCES users(user_id) ON DELETE CASCADE UNIQUE,
     current_streak INTEGER DEFAULT 0,
@@ -263,7 +265,7 @@ CREATE TABLE user_streaks (
 );
 
 -- Achievement Definitions
-CREATE TABLE achievements (
+CREATE TABLE IF NOT EXISTS achievements (
     achievement_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     achievement_code VARCHAR(50) UNIQUE NOT NULL,
     title VARCHAR(100) NOT NULL,
@@ -277,7 +279,7 @@ CREATE TABLE achievements (
 );
 
 -- User Achievements (Earned)
-CREATE TABLE user_achievements (
+CREATE TABLE IF NOT EXISTS user_achievements (
     user_achievement_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     user_id UUID REFERENCES users(user_id) ON DELETE CASCADE,
     achievement_id UUID REFERENCES achievements(achievement_id) ON DELETE CASCADE,
@@ -287,8 +289,8 @@ CREATE TABLE user_achievements (
 );
 
 -- Index for gamification queries
-CREATE INDEX idx_user_streaks_user ON user_streaks(user_id);
-CREATE INDEX idx_user_achievements_user ON user_achievements(user_id, earned_at DESC);
+CREATE INDEX IF NOT EXISTS idx_user_streaks_user ON user_streaks(user_id);
+CREATE INDEX IF NOT EXISTS idx_user_achievements_user ON user_achievements(user_id, earned_at DESC);
 
 -- =====================================================
 -- DEFAULT ACHIEVEMENTS (Initial Data)
@@ -324,7 +326,7 @@ INSERT INTO achievements (achievement_code, title, description, icon, category, 
 -- Chat achievements
 ('chat_with_luna', 'Made a Friend', 'Have your first chat with Luna', '🌙', 'engagement', 1, 'chat_sessions', 15),
 ('regular_chatter', 'Regular Chatter', 'Have 10 conversations with Luna', '💬', 'engagement', 10, 'chat_sessions', 40),
-('luna_friend', 'Luna\'s Friend', 'Have 50 conversations with Luna', '🌟', 'engagement', 50, 'chat_sessions', 100),
+('luna_friend', 'Luna''s Friend', 'Have 50 conversations with Luna', '🌟', 'engagement', 50, 'chat_sessions', 100),
 
 -- Wellness achievements
 ('mood_improver', 'Rising Spirits', 'Improve your mood by 3+ points in a week', '🌈', 'wellness', 3, 'mood_improvement', 75),
@@ -338,4 +340,5 @@ INSERT INTO achievements (achievement_code, title, description, icon, category, 
 ('night_owl', 'Night Owl', 'Log your mood after midnight', '🦉', 'milestone', 1, 'night_checkin', 15),
 ('early_bird', 'Early Bird', 'Log your mood before 7am', '🐦', 'milestone', 1, 'early_checkin', 15),
 ('weekend_warrior', 'Weekend Wellness', 'Check in on both Saturday and Sunday', '🎯', 'milestone', 1, 'weekend_complete', 20),
-('mood_explorer', 'Mood Explorer', 'Log all 5 different mood levels', '🎨', 'milestone', 5, 'mood_variety', 35);
+('mood_explorer', 'Mood Explorer', 'Log all 5 different mood levels', '🎨', 'milestone', 5, 'mood_variety', 35)
+ON CONFLICT (achievement_code) DO NOTHING;

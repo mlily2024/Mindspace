@@ -33,6 +33,11 @@ frontend/coverage/
 
 # Temp/junk files
 nul
+
+# Local-only one-shot scripts (e.g. seed-rich-demo.local.js).
+# Convention: *.local.js anywhere is gitignored, so throw-away scripts
+# that connect to prod-ish resources never get committed by accident.
+*.local.js
 tmpclaude-*
 
 # OS files

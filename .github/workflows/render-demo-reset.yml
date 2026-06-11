@@ -43,21 +43,22 @@ jobs:
 
     steps:
       - name: Check secrets are present
+        id: check
         run: |
-          if [ -z "$DATABASE_URL" ]; then
-            echo "::warning::RENDER_DATABASE_URL secret not set; skipping reset"
-            exit 0
+          if [ -z "$DATABASE_URL" ] || [ -z "$API_BASE_URL" ]; then
+            echo "::notice::RENDER_DATABASE_URL and/or RENDER_API_BASE secret(s) not configured yet; skipping reset (this is normal until both secrets are added to repo settings)"
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "Both secrets present — proceeding"
+            echo "skip=false" >> "$GITHUB_OUTPUT"
           fi
-          if [ -z "$API_BASE_URL" ]; then
-            echo "::warning::RENDER_API_BASE secret not set; skipping reset"
-            exit 0
-          fi
-          echo "Both secrets present — proceeding"
 
       - name: Check out repository
+        if: steps.check.outputs.skip != 'true'
         uses: actions/checkout@v4
 
       - name: Set up Node.js
+        if: steps.check.outputs.skip != 'true'
         uses: actions/setup-node@v4
         with:
           node-version: 18
@@ -65,10 +66,12 @@ jobs:
           cache-dependency-path: backend/package-lock.json
 
       - name: Install backend dependencies (only what reset-demo needs)
+        if: steps.check.outputs.skip != 'true'
         working-directory: backend
         # Production-only install — skips dev-deps to keep the job fast.
         run: npm ci --omit=dev
 
       - name: Run reset-demo.js
+        if: steps.check.outputs.skip != 'true'
         working-directory: backend
         run: node scripts/reset-demo.js

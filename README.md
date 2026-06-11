@@ -5,12 +5,116 @@
 [![Release](https://img.shields.io/github/v/release/mlily2024/Mindspace)](https://github.com/mlily2024/Mindspace/releases)
 [![Live demo](https://img.shields.io/badge/Live%20demo-mindspace--demo.onrender.com-purple)](https://mindspace-demo.onrender.com)
 
-**A full-stack, privacy-first mental-health platform combining mood tracking, AI-driven insights, a therapeutic chatbot, predictive analytics, and clinical-grade assessment — designed for students, professionals, parents and elderly users.**
+A full-stack mental-health platform built privacy-first by construction: not "we encrypt the data", but a composition of three independent privacy mechanisms that together make user content cryptographically unreadable to the server, statistically unidentifiable in aggregate, and structurally inaccessible to third-party services.
 
 Version 2.1.1 · MIT licensed · UK GDPR & Data Protection Act 2018 compliant · WCAG 2.1 AA accessible
 
-**🚀 Live demo:** [mindspace-demo.onrender.com](https://mindspace-demo.onrender.com) — log in as `demo@mindspace.local` / `DemoMindspace!2026`
-*(free-tier instance sleeps when idle; first request after a quiet period may take ~30 s to wake)*
+---
+
+## Why this exists
+
+Most mood-tracking apps treat privacy as a checkbox: "we encrypt notes at rest." The user's plaintext still touches the server, the operator can still derive cohort statistics that re-identify individuals, and sentiment-analysis features ship the entire journal entry to a third-party API.
+
+Mindspace was built to demonstrate that a serious privacy posture is **achievable for solo developers using off-the-shelf tooling**, with no special infrastructure. Every mechanism is grounded in a public cryptographic or statistical standard, and the full system runs from a `docker compose up`.
+
+---
+
+## Architecture — three composable privacy mechanisms
+
+Each mechanism is implemented in code referenced below and validated by tests on every push. They compose: they protect different attack surfaces, can be enabled independently, and do not weaken each other.
+
+### 1. Hash-chained AI audit log
+
+Every Luna chatbot interaction (rule-based, LLM-backed, or crisis-filter response) appends a privacy-preserving record to a **per-user hash chain**. SHA-256 fingerprints are stored, not plaintext. The DB layer enforces append-only at trigger level; `verifyChain(userId)` walks the chain end-to-end and returns the offending sequence number if any link is tampered with.
+
+| Property | How it is enforced |
+|---|---|
+| Append-only | PostgreSQL `BEFORE UPDATE` trigger blocks writes to existing rows |
+| Concurrent-safe | Per-user `pg_advisory_xact_lock` serialises chain appends |
+| Tamper-evident | Each row hashes the prior row's `record_hash` + canonical-form fields |
+| No plaintext | Conversation content stored as SHA-256 only |
+
+**Cryptographic basis:** Haber & Stornetta, "How to time-stamp a digital document" (1991).
+**Code:** `backend/src/services/aiAuditService.js` · `backend/database/migrations/009_ai_audit_log.sql`
+
+### 2. ε-differentially private cohort aggregates
+
+Cross-user statistics (e.g. average mood by day-of-week) are released through a **Laplace mechanism** with cryptographic randomness (`crypto.randomBytes`, not `Math.random`). A `PrivacyBudget` class tracks sequential composition per scope and refuses any query that would exceed the configured ε ceiling. Outputs are post-clamped to the bounded mood range `[1, 10]`; small-cell suppression hides under-populated buckets.
+
+| Property | How it is enforced |
+|---|---|
+| Mathematically-bounded leakage | Laplace noise scaled to query sensitivity |
+| Budget enforcement | `PrivacyBudget` denies queries exceeding scope ε |
+| Cryptographic randomness | `crypto.randomBytes` for noise draws |
+| Composition awareness | Parallel composition over partitioned queries |
+
+**Theoretical basis:** Dwork & Roth, *The Algorithmic Foundations of Differential Privacy* (2014); Dwork, McSherry, Nissim, Smith, "Calibrating noise to sensitivity in private data analysis" (2006).
+**First protected endpoint:** `GET /api/cohort-insights/mood-by-day-of-week`
+**Code:** `backend/src/services/differentialPrivacy.js` · `backend/src/services/cohortInsightsService.js`
+
+### 3. On-device sentiment analysis
+
+Sentiment classification of journal text runs **entirely in the user's browser** via Transformers.js (DistilBERT int8 quantised, ~67 MB cached after first load, 10-80 ms inference on modern hardware). The server only receives derived fields: `sentimentScore` ∈ [-1, 1], label, confidence, model id, character count, a SHA-256 of the text, inference time, and the linked mood-entry id. **Plaintext never leaves the device.**
+
+Opt-in via Settings → Privacy & Data. Disabled by default. Graceful fallback if the model fails to load: feature stays off, mood-save flow remains 100% functional.
+
+| Property | How it is enforced |
+|---|---|
+| Plaintext locality | Inference runs in the WebAssembly runtime of the browser |
+| No model exfiltration | Model weights served from a static CDN, not user-bound |
+| Verifiable transport | Server-side schema rejects requests carrying note text |
+| Opt-in by design | Off by default; failure mode preserves base mood functionality |
+
+**Model basis:** Sanh et al., "DistilBERT: a distilled version of BERT" (2019); Socher et al., SST-2 (2013).
+**New endpoint:** `POST /api/mood-sentiments`
+**Migration:** `backend/database/migrations/010_mood_sentiments.sql`
+**Code:** `frontend/src/services/sentimentService.js`
+
+---
+
+## Engineering quality
+
+| Signal | Status |
+|---|---|
+| Backend tests | **213 passing** across 15 suites — `cd backend && npm test` |
+| Backend lint | 0 ESLint errors (with a deliberate, minimal ruleset) |
+| Frontend lint | 0 ESLint errors |
+| CI | `.github/workflows/ci.yml` — 2 parallel jobs (backend + frontend), runs on every push and PR, ~40 seconds total |
+| Builds | Clean Vite build, coverage + dist artefacts uploaded per run |
+| Migrations | 10 numbered SQL migrations, idempotent (`CREATE TABLE IF NOT EXISTS`) |
+| Encryption | **AES-256-GCM** authenticated encryption only — no CryptoJS fallback (since commit `73f4655`); `decrypt()` throws on any non-AES-GCM input |
+| Crisis content | UK-localised, frozen module, regression-guarded against US-number reintroduction |
+| Releases | Annotated tags with embedded release notes; latest `v2.1.1` |
+
+---
+
+## Live demo
+
+A complete, publicly-accessible deployment of the system is hosted on Render.
+
+**URL:** `https://mindspace-demo.onrender.com`
+**Credentials (public):** `demo@mindspace.local` / `DemoMindspace!2026`
+
+> The demo runs on Render's free tier, which sleeps the backend after ~15 minutes of inactivity. The first request after a quiet period takes ~30 seconds while the container wakes. Subsequent requests are instant.
+
+### What to explore
+
+After logging in:
+
+| Page | What you'll see |
+|---|---|
+| **Home (Dashboard)** | Wellbeing summary card (average mood, sleep, check-ins over the last 30 days), current streak widget, achievement progress, personalised self-care recommendations |
+| **Check In** | The mood entry flow — emoji-driven 5-point mood selector with optional detail (energy, stress, sleep, anxiety, social interaction, free-text notes) |
+| **Insights** | The strongest single visualisation of the system: 3-week mood trend, weekday-best-day analysis, peak-time-of-day correlation, factor-impact panel ("Sleep Quality strong positive correlation with mood"), adaptive suggestions panel, and a coloured month-calendar of mood scores |
+| **Journal** | Free-text journal entries with optional on-device sentiment scoring (Settings → Privacy & Data → On-device sentiment to enable) |
+| **Self-Care** | Activity library categorised by user-group context |
+| **Settings → Privacy & Data** | The on-device sentiment toggle, data export, account deletion (right-to-be-forgotten), audit-log view |
+
+### About the demo data
+
+The demo account is seeded with three weeks of varied mood, sleep, and energy entries that demonstrate the insights engine producing real correlations from real data. The seeded arc deliberately includes a mid-period dip and recovery so the trend chart shows movement.
+
+The demo database is durable — entries you add as the demo user persist across deployments. If you want to test the account-deletion flow, register a fresh account; the demo user is preserved.
 
 ---
 
@@ -35,70 +139,61 @@ The screenshots below are captured automatically by `frontend/scripts/capture-sc
 
 ---
 
-## Overview
+## Beyond privacy: the rest of the system
 
-Mindspace is a production-grade mental-health monitoring platform built around a privacy-first architecture. It moves beyond episodic mood logging toward continuous, personalised wellbeing support: multi-dimensional tracking, machine-learning-driven trend prediction, an adaptive therapeutic chatbot, real-time risk detection with crisis-resource integration, and clinician-facing reporting.
-
-The system serves four primary user groups — students, professionals, parents and elderly users — with accessibility and data privacy treated as first-class design constraints rather than afterthoughts.
-
----
-
-## Features
+Mindspace is also a complete mental-health platform. The features below are built on top of the privacy foundation described above.
 
 ### Core tracking
-- **Multi-dimensional mood & wellbeing logging** — mood, energy, stress, anxiety, sleep quality, sleep hours, social-interaction quality, activities and triggers
-- **Encrypted private notes** — sensitive notes protected with authenticated encryption
-- **Historical analysis** — date-range filtering, trend visualisation, statistical summaries
+- Multi-dimensional mood and wellbeing logging (mood, energy, stress, anxiety, sleep quality, sleep hours, social-interaction quality, activities, triggers)
+- Encrypted private notes (AES-256-GCM authenticated encryption per record)
+- Historical analysis with date-range filtering, trend visualisation, statistical summaries
 
 ### Intelligence layer
-- **AI-driven insights engine** — automatic trend detection, pattern recognition, anomaly flagging, weekly/monthly summaries
-- **Predictive analytics** — mood-trend prediction and early-warning detection
-- **Adaptive recommendations** — personalised self-care activities that adjust to user feedback
-- **User segmentation & personalisation** — tailoring by life-stage group
+- AI-driven insights engine — automatic trend detection, pattern recognition, anomaly flagging, weekly and monthly summaries
+- Predictive analytics — mood-trend prediction and early-warning detection
+- Adaptive recommendations — personalised self-care activities that adjust to user feedback
+- User segmentation and personalisation by life-stage group
 
-### Luna 2.0 — therapeutic chatbot
-- Conversational support grounded in **CBT and ACT therapeutic techniques**
-- **Pluggable response engine** — defaults to the offline, zero-cost template engine; deployments can opt in to a **Claude-backed LLM** (per-user `llm_opted_in` toggle, GDPR-conscious) for richer responses. Crisis content is filtered before any LLM call, so safety never depends on a third-party service.
-- **UK-localised crisis detection** with keyword screening and direct escalation to UK helplines (Samaritans 116 123, Shout, NHS 111, Papyrus, 999).
-- **Tamper-evident AI audit log** — every Luna interaction (rule-based, LLM, or crisis-filter response) appends a privacy-preserving record (SHA-256 fingerprints, no plaintext) to a per-user hash chain. Append-only at the DB layer; `verifyChain(userId)` detects any after-the-fact mutation of either content or sequence.
-- **ε-differentially private cohort aggregates** — any cross-user statistic (e.g. average mood by day-of-week) is released through a Laplace mechanism with a tracked per-scope privacy budget, cryptographic randomness, and small-cell suppression. The first endpoint is `GET /api/cohort-insights/mood-by-day-of-week`.
-- **On-device sentiment analysis for journal text** — sentiment classification runs entirely in the user's browser via Transformers.js (DistilBERT int8, ~67 MB cached after first load). Only the derived score, label, confidence, model id, character count, and a SHA-256 of the text are sent to the server — **plaintext never leaves the device**. New endpoint `POST /api/mood-sentiments`.
-- **Emotional-granularity training** — helps users refine broad emotions into specific ones
-- Longitudinal conversation memory and data-informed responses
+### Luna therapeutic chatbot
+- Conversational support grounded in **CBT and ACT** therapeutic techniques
+- Pluggable response engine — defaults to the offline, zero-cost template engine; deployments can opt in to a Claude-backed LLM (per-user `llm_opted_in` toggle, GDPR-conscious) for richer responses. Crisis content is filtered **before** any LLM call, so safety never depends on a third-party service
+- UK-localised crisis detection with direct escalation to UK helplines (Samaritans, Shout, NHS 111, Papyrus, 999)
+- Every interaction recorded in the hash-chained audit log described above
+- Emotional-granularity training to refine broad emotions into specific ones
+- Longitudinal conversation memory
 
-### Clinical & advanced features
-- **Clinical assessment** instruments and **clinician-facing reports**
-- **Voice analysis** — voice-signature and emotional-tone analysis
-- **Wearable integration** — biometric correlation with mood data (pluggable provider model)
-- **Ecological Momentary Assessment (EMA)** and **quick check-ins**
-- **Micro-interventions** and structured **therapeutic protocols**
-- **Anonymous peer support** with automated moderation
-- **Gamification** — engagement and habit-building mechanics
+### Clinical and advanced features
+- Clinical assessment instruments and clinician-facing reports
+- Voice analysis — voice-signature and emotional-tone analysis (accepts pre-extracted features)
+- Wearable integration — biometric correlation with mood data (pluggable provider model)
+- Ecological Momentary Assessment (EMA) and quick check-ins
+- Micro-interventions and structured therapeutic protocols
+- Anonymous peer support with automated moderation
+- Gamification — engagement and habit-building mechanics
 
-### Safety & crisis support
-- **Real-time risk detection** with severity tiers (low / moderate / high / critical)
-- **UK-specific crisis resources** integrated and always accessible (see below)
+### Safety and crisis support
+- Real-time risk detection with severity tiers (low / moderate / high / critical)
+- UK-specific crisis resources integrated and always accessible (see below)
 
 ### Notifications
-- **Real-time in-app notifications** via Socket.io for online users (instant, no permission prompt)
-- **Browser push notifications** via Web Push (VAPID) for users with the tab closed — opt-in only, per-browser; safety alerts, insights, peer messages and streak updates delivered to the OS notification tray. Stale endpoints auto-prune; per-subscription failures are isolated.
+- Real-time in-app notifications via Socket.io for online users (instant, no permission prompt)
+- Browser push notifications via Web Push (VAPID) for users with the tab closed — opt-in only, per-browser. Stale endpoints auto-prune; per-subscription failures are isolated
 
-### Privacy, security & accessibility
-- **AES-256-GCM authenticated encryption** for sensitive data (per-record unique IV + auth-tag tamper detection)
-- **bcrypt password hashing**, **JWT authentication**, **Helmet security headers** (CSP + HSTS), **rate limiting**, **input validation/sanitisation**, **parameterised queries**
-- **UK GDPR & Data Protection Act 2018 compliance** — data export, account deletion (right to be forgotten), audit logging, data-retention controls
-- **WCAG 2.1 Level AA** — keyboard navigation, screen-reader support, adjustable font sizes, high-contrast mode, reduced-motion support, semantic HTML, ARIA labelling
+### Security and accessibility
+- bcrypt password hashing, JWT authentication, Helmet security headers (CSP + HSTS), rate limiting, input validation/sanitisation, parameterised queries
+- UK GDPR and Data Protection Act 2018 compliance — data export, account deletion, audit logging, data-retention controls
+- WCAG 2.1 Level AA — keyboard navigation, screen-reader support, adjustable font sizes, high-contrast mode, reduced-motion support, semantic HTML, ARIA labelling
 
 ---
 
 ## Technology stack
 
 ### Backend
-- **Runtime:** Node.js, Express 4
-- **Database:** PostgreSQL (via `pg`)
+- **Runtime:** Node.js 18+, Express 4
+- **Database:** PostgreSQL 14+ (via `pg`)
 - **Authentication:** JWT (`jsonwebtoken`) + bcryptjs
-- **Encryption:** Node native `crypto` — **AES-256-GCM** (authenticated encryption)
-- **Real-time:** Socket.io (notifications, live updates)
+- **Encryption:** Node native `crypto` — AES-256-GCM only
+- **Real-time:** Socket.io
 - **Security:** Helmet, CORS, express-rate-limit, express-validator
 - **Logging:** Winston
 
@@ -110,6 +205,7 @@ The system serves four primary user groups — students, professionals, parents 
 - **HTTP:** Axios
 - **Charts:** Recharts
 - **Real-time:** Socket.io-client
+- **ML:** Transformers.js (DistilBERT int8) for on-device sentiment
 
 ---
 
@@ -204,6 +300,8 @@ The backend exposes a RESTful API under `/api`, including:
 |---|---|
 | Authentication | `/api/auth` |
 | Mood tracking | `/api/mood` |
+| Mood sentiments (on-device-sourced) | `/api/mood-sentiments` |
+| Cohort insights (ε-DP-protected) | `/api/cohort-insights` |
 | Insights | `/api/insights` |
 | Recommendations | `/api/recommendations` |
 | Luna chatbot | `/api/chatbot`, `/api/luna` |
@@ -217,6 +315,7 @@ The backend exposes a RESTful API under `/api`, including:
 | Protocols | `/api/protocols` |
 | Clinical assessments | `/api/assessments` |
 | Clinician reports | `/api/clinician-reports` |
+| Push notifications | `/api/push` |
 | Admin | `/api/admin` |
 
 ---
@@ -232,28 +331,32 @@ Mindspace/
 │   │   ├── middleware/    # auth, validation, error handling
 │   │   ├── models/        # database models
 │   │   ├── routes/        # API route definitions
-│   │   ├── services/      # business logic (ML engine, Luna, insights, etc.)
+│   │   ├── services/      # business logic (insights, Luna, audit log, DP, cache)
 │   │   ├── handlers/      # socket.io event handlers
 │   │   ├── utils/         # encryption and helpers
 │   │   ├── data/          # therapeutic technique data
 │   │   └── server.js      # application entry point
 │   ├── database/          # backend-local schema copy
+│   ├── scripts/           # operational scripts (migrations, seeders, push tests)
 │   ├── Dockerfile
 │   └── .env.example
 ├── frontend/
 │   ├── src/               # React application
+│   ├── services/          # client-side services (sentiment, API)
 │   ├── Dockerfile
 │   └── nginx.conf
 ├── database/
-│   └── schema.sql         # PostgreSQL schema (GDPR-compliant design)
-├── docs/                  # API, deployment, and quick-start documentation
+│   ├── schema.sql         # PostgreSQL schema (GDPR-compliant design)
+│   └── migrations/        # numbered idempotent migrations 001-010
+├── docs/                  # screenshots
+├── .github/workflows/     # CI (ci.yml) + nightly demo refresh (render-demo-reset.yml)
 ├── docker-compose.yml
 └── README.md
 ```
 
 ---
 
-## User groups & personalisation
+## User groups and personalisation
 
 | Group | Focus |
 |---|---|
@@ -309,17 +412,27 @@ node backend/scripts/send-test-push.js              # list subscribed users
 node backend/scripts/send-test-push.js <userId>     # send a real notification
 ```
 
+---
+
 ## Testing
 
 ```bash
 cd backend
-npm test          # Jest test suite with coverage
+npm test          # Jest test suite with coverage (213 tests across 15 suites)
 ```
 
 ```bash
 cd frontend
 npm run lint      # ESLint
 ```
+
+CI runs both on every push and PR via `.github/workflows/ci.yml`.
+
+---
+
+## Contributing
+
+Mindspace is currently developed by a single contributor as an independent open-source project. Issues and pull requests are welcome — please open an issue first to discuss any non-trivial change.
 
 ---
 

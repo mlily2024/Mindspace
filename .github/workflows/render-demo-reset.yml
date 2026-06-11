@@ -23,8 +23,24 @@ name: Render demo nightly reset
 #   GitHub Actions tab → Render demo nightly reset → Run workflow.
 
 on:
-  schedule:
-    - cron: "0 3 * * *"
+  # Scheduled trigger PARKED (2026-06-11): seed-demo-data.js needs the
+  # backend's auto-generated ENCRYPTION_KEY to encrypt mood-entry notes,
+  # which GitHub Actions does not have. The wipe stage works; the seed
+  # stage crashes with `seed-demo-data exited with code 1`. The demo
+  # itself is fully functional — auto-reset is polish, not core.
+  #
+  # To re-enable: pick one of two fix paths:
+  #   B. Refactor seed-demo-data.js to be API-only (POST /api/mood instead
+  #      of direct DB INSERT). Backend handles encryption transparently.
+  #      Trade-off: mood entries lose backdating, all become "today".
+  #   C. Extract ENCRYPTION_KEY from Render dashboard (Environment tab,
+  #      click Show on the auto-generated value), add it as
+  #      RENDER_ENCRYPTION_KEY repo secret, set ENCRYPTION_KEY env in
+  #      this job. Couples cron to a Render-rotation cycle.
+  #
+  # Once a fix is in place, restore:
+  #   schedule:
+  #     - cron: "0 3 * * *"
   workflow_dispatch:
 
 jobs:

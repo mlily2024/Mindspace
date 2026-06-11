@@ -2,7 +2,10 @@
 
 **A full-stack, privacy-first mental-health platform combining mood tracking, AI-driven insights, a therapeutic chatbot, predictive analytics, and clinical-grade assessment — designed for students, professionals, parents and elderly users.**
 
-Version 2.0.0 · MIT licensed · UK GDPR & Data Protection Act 2018 compliant · WCAG 2.1 AA accessible
+Version 2.1.1 · MIT licensed · UK GDPR & Data Protection Act 2018 compliant · WCAG 2.1 AA accessible
+
+**🚀 Live demo:** [mindspace-demo.onrender.com](https://mindspace-demo.onrender.com) — log in as `demo@mindspace.local` / `DemoMindspace!2026`
+*(free-tier instance sleeps when idle; first request after a quiet period may take ~30 s to wake)*
 
 ---
 

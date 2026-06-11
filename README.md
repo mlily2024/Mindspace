@@ -1,5 +1,10 @@
 # Mindspace — Privacy-First Mental Health Tracker
 
+[![CI](https://github.com/mlily2024/Mindspace/actions/workflows/ci.yml/badge.svg)](https://github.com/mlily2024/Mindspace/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Release](https://img.shields.io/github/v/release/mlily2024/Mindspace)](https://github.com/mlily2024/Mindspace/releases)
+[![Live demo](https://img.shields.io/badge/Live%20demo-mindspace--demo.onrender.com-purple)](https://mindspace-demo.onrender.com)
+
 **A full-stack, privacy-first mental-health platform combining mood tracking, AI-driven insights, a therapeutic chatbot, predictive analytics, and clinical-grade assessment — designed for students, professionals, parents and elderly users.**
 
 Version 2.1.1 · MIT licensed · UK GDPR & Data Protection Act 2018 compliant · WCAG 2.1 AA accessible

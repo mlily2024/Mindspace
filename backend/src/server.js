@@ -45,6 +45,8 @@ const cohortInsightsRoutes = require('./routes/cohortInsightsRoutes');
 const moodSentimentRoutes = require('./routes/moodSentimentRoutes');
 // User-facing audit-log verification (Phase 1.2, ADR-0008)
 const auditRoutes = require('./routes/auditRoutes');
+// End-to-end encryption with client-side keys (Phase 1.3, ADR-0009)
+const e2eeRoutes = require('./routes/e2eeRoutes');
 
 // Initialize Express app
 const app = express();
@@ -165,6 +167,7 @@ app.use('/api/push', pushRoutes);
 app.use('/api/cohort-insights', cohortInsightsRoutes);
 app.use('/api/mood-sentiments', moodSentimentRoutes);
 app.use('/api/audit', auditRoutes);
+app.use('/api/e2ee', e2eeRoutes);
 
 // 404 handler
 app.use(notFound);

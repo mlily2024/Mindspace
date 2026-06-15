@@ -19,7 +19,8 @@
  * This module is pure: no module-level state, no side effects.
  */
 import { generateMnemonic, validateMnemonic } from '@scure/bip39';
-import { wordlist } from '@scure/bip39/wordlists/english';
+// @scure/bip39 v2 exports wordlists with explicit .js suffix per its exports map.
+import { wordlist } from '@scure/bip39/wordlists/english.js';
 
 export const RECOVERY_WORD_COUNT = 12;
 export const RECOVERY_ENTROPY_BITS = 128; // generateMnemonic(wordlist, 128) → 12 words

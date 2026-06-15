@@ -113,6 +113,14 @@ export const auditAPI = {
   downloadMine: () => api.get('/audit/download-mine')
 };
 
+// E2EE API (Phase 1.3, 2026-06-16) — client-side-key key-wrapping endpoints
+// (ADR-0009). The bundle here is opaque to the server.
+export const e2eeAPI = {
+  getMetadata: () => api.get('/e2ee/metadata'),
+  setup:       (bundle) => api.post('/e2ee/setup', bundle),
+  rewrap:      (wrap) => api.put('/e2ee/rewrap', wrap)
+};
+
 // Mood API
 export const moodAPI = {
   create: (entry) => api.post('/mood', entry),

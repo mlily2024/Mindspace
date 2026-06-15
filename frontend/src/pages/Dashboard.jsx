@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import Navigation from '../components/Navigation';
 import StreakDisplay, { AchievementsGrid } from '../components/StreakDisplay';
 import MoodForecast from '../components/MoodForecast';
+import SetUpEncryption from '../components/SetUpEncryption';
 import { useAuth } from '../context/AuthContext';
 import { moodAPI, insightsAPI, recommendationsAPI, gamificationAPI } from '../services/api';
 
@@ -124,6 +125,10 @@ const Dashboard = () => {
   return (
     <div style={pageStyle}>
       <Navigation />
+      {/* Phase 1.3 (2026-06-16): dismissible first-login E2EE setup prompt.
+          Renders nothing for users already enrolled or who dismissed.
+          Never blocks the Dashboard render path — modal overlay only. */}
+      <SetUpEncryption />
       <main id="main-content" className="container" style={{ paddingTop: 'var(--spacing-xl)', paddingBottom: 'var(--spacing-xxl)' }}>
 
         {/* Safety Alert (if any) */}

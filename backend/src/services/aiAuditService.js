@@ -230,10 +230,56 @@ const safeAppend = (args) => {
   });
 };
 
+/**
+ * Export the user's full chain in a form suitable for independent verification.
+ * Returns the same canonical-payload fields used to compute `record_hash`, plus
+ * the hash + prev_hash for every row. A caller can rebuild each `record_hash`
+ * locally with the algorithm in this module (or any independent implementation
+ * of SHA-256 + the documented canonical payload) and confirm the chain is intact
+ * without trusting the server's `verifyChain` result.
+ *
+ * Phase 1.2 of the privacy-enhancements handover (2026-06-15).
+ */
+const exportChain = async (userId) => {
+  const r = await db.query(
+    `SELECT audit_id, user_id, sequence_number, created_at,
+            conversation_id, provider, model_version,
+            input_hash, output_hash, safety_verdict, output_classification,
+            latency_ms, record_hash, prev_hash
+       FROM ai_audit_log
+      WHERE user_id = $1
+      ORDER BY sequence_number ASC`,
+    [userId]
+  );
+  return {
+    user_id:      userId,
+    exported_at:  new Date().toISOString(),
+    chain_length: r.rows.length,
+    genesis:      GENESIS,
+    hash_algo:    'SHA-256 over stable-stringified canonical payload (see aiAuditService.canonicalPayload)',
+    records:      r.rows.map((row) => ({
+      audit_id:              row.audit_id,
+      sequence_number:       Number(row.sequence_number),
+      created_at:            row.created_at,
+      conversation_id:       row.conversation_id,
+      provider:              row.provider,
+      model_version:         row.model_version,
+      input_hash:            row.input_hash,
+      output_hash:           row.output_hash,
+      safety_verdict:        row.safety_verdict,
+      output_classification: row.output_classification,
+      latency_ms:            row.latency_ms === null ? null : Number(row.latency_ms),
+      record_hash:           row.record_hash,
+      prev_hash:             row.prev_hash
+    }))
+  };
+};
+
 module.exports = {
   append,
   safeAppend,
   verifyChain,
+  exportChain,
   // Exported for testing — the hash logic is the load-bearing bit.
   _internal: { stableStringify, sha256Hex, canonicalPayload, computeRecordHash, GENESIS, userLockKey }
 };

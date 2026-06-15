@@ -43,6 +43,8 @@ const pushRoutes = require('./routes/pushRoutes');
 const cohortInsightsRoutes = require('./routes/cohortInsightsRoutes');
 // On-device sentiment analysis (ADR-0006)
 const moodSentimentRoutes = require('./routes/moodSentimentRoutes');
+// User-facing audit-log verification (Phase 1.2, ADR-0008)
+const auditRoutes = require('./routes/auditRoutes');
 
 // Initialize Express app
 const app = express();
@@ -162,6 +164,7 @@ app.use('/api/clinician-reports', clinicianReportRoutes);
 app.use('/api/push', pushRoutes);
 app.use('/api/cohort-insights', cohortInsightsRoutes);
 app.use('/api/mood-sentiments', moodSentimentRoutes);
+app.use('/api/audit', auditRoutes);
 
 // 404 handler
 app.use(notFound);

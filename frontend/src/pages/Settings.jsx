@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import Navigation from '../components/Navigation';
 import PrivacyNutritionLabel from '../components/PrivacyNutritionLabel';
+import AuditLogVerification from '../components/AuditLogVerification';
 import { useAuth } from '../context/AuthContext';
 import { authAPI } from '../services/api';
 import pushService from '../services/pushService';
@@ -439,6 +440,10 @@ const PrivacySettings = ({ user: _user, setSuccess }) => {
           Pure presentational, no API. Renders above the existing controls so a
           first-time visitor reads WHAT protects them before WHICH controls to use. */}
       <PrivacyNutritionLabel />
+
+      {/* Phase 1.2 (2026-06-15): user-facing audit log verification.
+          Surfaces ADR-0004's hash chain as a clickable Verify + Download UI. */}
+      <AuditLogVerification />
 
     <div className="card">
       <h2 style={{ marginBottom: 'var(--spacing-lg)' }}>Privacy & Data</h2>

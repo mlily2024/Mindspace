@@ -106,6 +106,13 @@ export const authAPI = {
   permanentDeleteAccount: (confirmDelete) => api.delete('/auth/account/permanent', { data: { confirmDelete } })
 };
 
+// Audit log API (Phase 1.2, 2026-06-15)
+// User-facing endpoints for the hash-chained AI audit log (ADR-0004 + ADR-0008).
+export const auditAPI = {
+  verifyMine:   () => api.get('/audit/verify-mine'),
+  downloadMine: () => api.get('/audit/download-mine')
+};
+
 // Mood API
 export const moodAPI = {
   create: (entry) => api.post('/mood', entry),

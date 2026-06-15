@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import Navigation from '../components/Navigation';
+import PrivacyNutritionLabel from '../components/PrivacyNutritionLabel';
 import { useAuth } from '../context/AuthContext';
 import { authAPI } from '../services/api';
 import pushService from '../services/pushService';
@@ -433,6 +434,12 @@ const PrivacySettings = ({ user: _user, setSuccess }) => {
   };
 
   return (
+    <>
+      {/* Phase 1.1 (2026-06-15): at-a-glance summary of the privacy mechanisms.
+          Pure presentational, no API. Renders above the existing controls so a
+          first-time visitor reads WHAT protects them before WHICH controls to use. */}
+      <PrivacyNutritionLabel />
+
     <div className="card">
       <h2 style={{ marginBottom: 'var(--spacing-lg)' }}>Privacy & Data</h2>
 
@@ -548,6 +555,7 @@ const PrivacySettings = ({ user: _user, setSuccess }) => {
         )}
       </div>
     </div>
+    </>
   );
 };
 

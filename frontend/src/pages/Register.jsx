@@ -6,6 +6,7 @@ const Register = () => {
   const [formData, setFormData] = useState({
     email: '',
     password: '',
+    confirmPassword: '',
     username: '',
     userGroup: null
   });
@@ -29,6 +30,12 @@ const Register = () => {
 
     if (formData.password.length < 8) {
       setError('Password must be at least 8 characters');
+      setLoading(false);
+      return;
+    }
+    // 2026-06-16: client-side typo guard — confirm-password match
+    if (formData.password !== formData.confirmPassword) {
+      setError('Passwords do not match');
       setLoading(false);
       return;
     }
@@ -246,6 +253,45 @@ const Register = () => {
                 {showPassword ? '🙈' : '👁️'}
               </button>
             </div>
+          </div>
+
+          {/* Confirm Password — typo guard, added 2026-06-16. Visibility
+              follows the same showPassword toggle as the password field so
+              users only flip one switch to verify both values. */}
+          <div style={{ marginBottom: 'var(--spacing-xl)' }}>
+            <label
+              htmlFor="confirmPassword"
+              style={{
+                display: 'block',
+                marginBottom: 'var(--spacing-sm)',
+                fontWeight: 600,
+                color: 'var(--text-primary)'
+              }}
+            >
+              Confirm Password
+            </label>
+            <input
+              type={showPassword ? 'text' : 'password'}
+              id="confirmPassword"
+              style={inputStyle}
+              value={formData.confirmPassword}
+              onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })}
+              required
+              minLength="8"
+              autoComplete="new-password"
+              aria-required="true"
+              placeholder="Type the same password again"
+            />
+            {formData.confirmPassword.length > 0 &&
+             formData.password !== formData.confirmPassword && (
+              <p style={{
+                marginTop: 'var(--spacing-xs)',
+                color: '#c53030',
+                fontSize: '0.85em'
+              }} role="status" aria-live="polite">
+                Passwords do not match yet
+              </p>
+            )}
           </div>
 
           {/* Submit Button */}

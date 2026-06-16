@@ -5,9 +5,9 @@
 [![Release](https://img.shields.io/github/v/release/mlily2024/Mindspace)](https://github.com/mlily2024/Mindspace/releases)
 [![Live demo](https://img.shields.io/badge/Live%20demo-mindspace--demo.onrender.com-purple)](https://mindspace-demo.onrender.com)
 
-A full-stack mental-health platform built privacy-first by construction: not "we encrypt the data", but a composition of three independent privacy mechanisms that together make user content cryptographically unreadable to the server, statistically unidentifiable in aggregate, and structurally inaccessible to third-party services.
+A full-stack mental-health platform built privacy-first by construction: not "we encrypt the data", but a composition of four independent privacy mechanisms that together make user content cryptographically unreadable to the operator, statistically unidentifiable in aggregate, structurally inaccessible to third-party services, and, for journal notes, sealed at-rest with a key only the user holds.
 
-Version 2.1.1 · MIT licensed · UK GDPR & Data Protection Act 2018 compliant · WCAG 2.1 AA accessible
+Version 3.0.0 · MIT licensed · UK GDPR & Data Protection Act 2018 compliant · WCAG 2.1 AA accessible
 
 ---
 
@@ -70,21 +70,42 @@ Opt-in via Settings → Privacy & Data. Disabled by default. Graceful fallback i
 **Migration:** `backend/database/migrations/010_mood_sentiments.sql`
 **Code:** `frontend/src/services/sentimentService.js`
 
+### 4. Client-side end-to-end encryption for journal notes
+
+Journal `notes` are encrypted **in the user's browser** with a master key derived from a passphrase via Argon2id. The server stores the opaque ciphertext and a passphrase-wrapped copy of the master key; **the operator has no way to decrypt either**, even with full database + application-secret access. A 12-word BIP-39 recovery phrase wraps a second copy of the master key as a forgotten-passphrase fallback.
+
+A first-login wizard sets up the keys; subsequent logins prompt for the passphrase (or recovery phrase) to derive the master key into in-memory cache for that tab. A Settings card lets existing users upgrade their legacy server-encrypted notes to E2EE one entry at a time, after which the server can no longer read them.
+
+| Property | How it is enforced |
+|---|---|
+| Operator cannot read plaintext | AES-256-GCM ciphertext stored; key never leaves the device |
+| Forgotten passphrase has a path back | BIP-39 recovery phrase wraps a second copy of the master key |
+| In-memory key lifetime | Master key cached in JS memory only; cleared on tab close |
+| Strong KDF | Argon2id with device-benchmarked cost (target ~500 ms derive) |
+| Graceful degradation | If user has not unlocked, writes fall back to server-side encryption; calendar shows a 🔒 placeholder for E2EE notes |
+| Migration path | One-click Settings card re-encrypts legacy server-encrypted notes |
+
+**Cryptographic basis:** Argon2id (RFC 9106, 2021); AES-256-GCM (NIST SP 800-38D); BIP-39 (Bitcoin standard, 2013).
+**New endpoints:** `GET/POST/PUT /api/e2ee/metadata`
+**Migration:** `backend/database/migrations/011_e2ee_metadata.sql`
+**Design:** local ADR-0009 (kept off the public repo per the `*.md` + `!README.md` policy)
+**Code:** `frontend/src/services/{encryptionE2EE,keyManagement,moodEntryE2EE}.js`, `frontend/src/components/{SetUpEncryption,UnlockEncryption,UpgradeNotesToE2EE}.jsx`
+
 ---
 
 ## Engineering quality
 
 | Signal | Status |
 |---|---|
-| Backend tests | **213 passing** across 15 suites — `cd backend && npm test` |
+| Backend tests | **254 passing** across 18 suites — `cd backend && npm test` |
 | Backend lint | 0 ESLint errors (with a deliberate, minimal ruleset) |
 | Frontend lint | 0 ESLint errors |
 | CI | `.github/workflows/ci.yml` — 2 parallel jobs (backend + frontend), runs on every push and PR, ~40 seconds total |
 | Builds | Clean Vite build, coverage + dist artefacts uploaded per run |
-| Migrations | 10 numbered SQL migrations, idempotent (`CREATE TABLE IF NOT EXISTS`) |
-| Encryption | **AES-256-GCM** authenticated encryption only — no CryptoJS fallback (since commit `73f4655`); `decrypt()` throws on any non-AES-GCM input |
+| Migrations | 11 numbered SQL migrations, idempotent (`CREATE TABLE IF NOT EXISTS`) |
+| Encryption | **AES-256-GCM** at every layer: server side (legacy, since `73f4655`) and client side (E2EE, since v3.0.0); `decrypt()` throws on any non-AES-GCM input |
 | Crisis content | UK-localised, frozen module, regression-guarded against US-number reintroduction |
-| Releases | Annotated tags with embedded release notes; latest `v2.1.1` |
+| Releases | Annotated tags with embedded release notes; latest `v3.0.0` (E2EE) |
 
 ---
 

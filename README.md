@@ -145,18 +145,23 @@ The screenshots below are captured automatically by `frontend/scripts/capture-sc
 
 ### Dashboard
 ![Dashboard](docs/screenshots/dashboard.png)
+The landing view after sign-in: today's mood, 7-day trend, current streak, and the unlock-or-set-up E2EE prompt for users who haven't unlocked their master key this session.
 
 ### Mood entry
 ![Mood entry](docs/screenshots/mood-entry.png)
+The multi-dimensional check-in form: mood, energy, stress, sleep, anxiety, social interaction, notes. With E2EE unlocked, the notes field is encrypted in the browser before POST; the server stores only opaque ciphertext.
 
 ### Insights and trends
 ![Insights](docs/screenshots/insights.png)
+Personal insights and trend analysis. Cohort comparisons use the ε-DP-protected `/api/cohort-insights/*` surface, so individual user values never appear in aggregates.
 
 ### Luna therapeutic chatbot
 ![Luna chatbot](docs/screenshots/luna-chatbot.png)
+Luna routes between rule-based templates, the Anthropic LLM, and the crisis filter. Every turn is appended to the hash-chained AI audit log, so any tampering is detectable by `verifyChain()`.
 
 ### UK crisis resources
 ![Crisis resources](docs/screenshots/crisis-resources.png)
+Frozen, UK-localised crisis content (Samaritans 116 123, Shout 85258, NHS 111). The safety filter intercepts crisis-language inputs from any code path before any LLM call.
 
 ---
 
@@ -368,7 +373,7 @@ Mindspace/
 │   └── nginx.conf
 ├── database/
 │   ├── schema.sql         # PostgreSQL schema (GDPR-compliant design)
-│   └── migrations/        # numbered idempotent migrations 001-010
+│   └── migrations/        # numbered idempotent migrations 001-011
 ├── docs/                  # screenshots
 ├── .github/workflows/     # CI (ci.yml) + nightly demo refresh (render-demo-reset.yml)
 ├── docker-compose.yml

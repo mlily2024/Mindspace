@@ -1,6 +1,20 @@
 import { io } from 'socket.io-client';
 
-const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || 'http://localhost:5000';
+// 2026-06-16: derive the socket host from VITE_API_BASE_URL when
+// VITE_SOCKET_URL is not explicitly set. Previously the Render demo
+// fell back to localhost:5000 because only VITE_API_BASE_URL was wired
+// in render.yaml, so the static build baked the wrong host in.
+// Strip a trailing `/api` (or `/api/`) so socket.io connects to the
+// backend's root, not to the REST mount path.
+const deriveSocketUrlFromApiBase = () => {
+  const apiBase = import.meta.env.VITE_API_BASE_URL;
+  if (!apiBase) return null;
+  return apiBase.replace(/\/api\/?$/, '');
+};
+
+const SOCKET_URL = import.meta.env.VITE_SOCKET_URL
+  || deriveSocketUrlFromApiBase()
+  || 'http://localhost:5000';
 
 let socket = null;
 let reconnectAttempts = 0;

@@ -445,10 +445,15 @@ const LunaChat = () => {
 
   return (
     <>
-      {/* FAB toggle */}
+      {/* FAB toggle. 2026-06-16: className "chat-toggle" is the hook
+          Insights uses to open Luna programmatically via
+          document.querySelector('.chat-toggle').click() — without it,
+          the "Chat with Luna" action button on the Insights page
+          silently no-ops because the FAB had no matching selector. */}
       {!isOpen && (
         <button
           onClick={() => setIsOpen(true)}
+          className="chat-toggle"
           style={fabStyle}
           aria-label="Open Luna chat"
         >

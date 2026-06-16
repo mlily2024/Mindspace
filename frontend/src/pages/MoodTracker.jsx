@@ -6,6 +6,7 @@ import VoiceCheckIn from '../components/VoiceCheckIn';
 import EnhancedFeedback from '../components/EnhancedFeedback';
 import MicroInterventionModal from '../components/MicroInterventionModal';
 import { moodAPI, moodSentimentsAPI } from '../services/api';
+import { wrapForWrite } from '../services/moodEntryE2EE';
 import { SENTIMENT_OPT_IN_KEY } from './Settings';
 
 // Minimum notes length to bother running on-device sentiment. Shorter than
@@ -77,7 +78,15 @@ const MoodTracker = () => {
     setLoading(true);
 
     try {
-      const response = await moodAPI.create(formData);
+      // Phase 1.3 step 5 (ADR-0009): if the user has unlocked their master
+      // key this session, encrypt the notes client-side before POST.
+      // wrapForWrite is GRACEFUL: if no key is cached or encryption fails,
+      // it returns the formData unchanged (with is_e2ee_encrypted=false),
+      // and the server's legacy AES-GCM path takes over as before.
+      const { notes: notesForServer, is_e2ee_encrypted } = await wrapForWrite(formData.notes);
+      const payload = { ...formData, notes: notesForServer, is_e2ee_encrypted };
+
+      const response = await moodAPI.create(payload);
       setSuccess(true);
 
       // Phase 1: Capture enhanced feedback and intervention from response

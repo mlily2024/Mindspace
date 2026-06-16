@@ -30,9 +30,27 @@ const MoodCalendar = () => {
         limit: 100
       });
 
+      // Phase 1.3 step 6 (ADR-0009): decrypt any E2EE-flagged notes
+      // client-side. unwrapForRead is graceful: if the master key is
+      // not cached this session, the opaque blob is stripped and the
+      // UI shows a 🔒 placeholder rather than the gibberish ciphertext.
+      const entries = response.data.entries || [];
+      const { unwrapForRead } = await import('../services/moodEntryE2EE');
+      await Promise.all(entries.map(async (entry) => {
+        if (entry.is_e2ee_encrypted && entry.notes) {
+          const { plaintext, decrypted } = await unwrapForRead(entry.notes, true);
+          if (decrypted) {
+            entry.notes = plaintext;
+          } else {
+            entry._notesLocked = true;
+            entry.notes = null;
+          }
+        }
+      }));
+
       // Group entries by date
       const grouped = {};
-      (response.data.entries || []).forEach(entry => {
+      entries.forEach(entry => {
         const date = entry.entry_date.split('T')[0];
         if (!grouped[date]) {
           grouped[date] = [];
@@ -291,7 +309,22 @@ const MoodCalendar = () => {
             <strong>Check-ins:</strong> {selectedDay.data.count}
           </p>
 
-          {selectedDay.data.entries.length > 0 && selectedDay.data.entries[0].notes && (
+          {selectedDay.data.entries.length > 0 && selectedDay.data.entries[0]._notesLocked && (
+            <div style={{
+              marginTop: 'var(--spacing-md)',
+              padding: 'var(--spacing-md)',
+              background: 'var(--surface)',
+              borderRadius: 'var(--radius-md)',
+              fontSize: 'var(--font-size-small)',
+              color: 'var(--text-secondary)',
+              fontStyle: 'italic',
+              border: '1px dashed var(--border)'
+            }}>
+              🔒 This note is end-to-end encrypted. Unlock from the Dashboard prompt to read it.
+            </div>
+          )}
+
+          {selectedDay.data.entries.length > 0 && selectedDay.data.entries[0].notes && !selectedDay.data.entries[0]._notesLocked && (
             <div style={{
               marginTop: 'var(--spacing-md)',
               padding: 'var(--spacing-md)',

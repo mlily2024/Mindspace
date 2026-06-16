@@ -19,19 +19,37 @@ class MoodEntry {
       socialInteractionQuality,
       notes,
       activities,
-      triggers
+      triggers,
+      // Phase 1.3 step 5+7 (ADR-0009): when TRUE, `notes` is already an
+      // opaque client-encrypted blob — store as-is, do NOT call encrypt().
+      is_e2ee_encrypted: isE2EE = false
     } = entryData;
 
-    // Encrypt sensitive notes if provided
-    const encryptedNotes = notes ? encrypt(notes) : null;
+    // Branch on the E2EE flag:
+    //   E2EE on  → notes is an opaque blob; store unchanged; is_encrypted=false; is_e2ee_encrypted=true
+    //   E2EE off → notes (if any) is plaintext; encrypt with server key; is_encrypted=true; is_e2ee_encrypted=false
+    //   no notes → both flags false
+    let notesForDb = null;
+    let isLegacyEncrypted = false;
+    if (notes) {
+      if (isE2EE) {
+        notesForDb = notes;
+        isLegacyEncrypted = false;
+      } else {
+        notesForDb = encrypt(notes);
+        isLegacyEncrypted = true;
+      }
+    }
+    const finalE2EEFlag = isE2EE && Boolean(notes);
 
     const query = `
       INSERT INTO mood_entries (
         entry_id, user_id, entry_date, entry_time,
         mood_score, energy_level, stress_level, sleep_quality, sleep_hours,
-        anxiety_level, social_interaction_quality, notes, activities, triggers, is_encrypted
+        anxiety_level, social_interaction_quality, notes, activities, triggers,
+        is_encrypted, is_e2ee_encrypted
       )
-      VALUES ($1, $2, CURRENT_DATE, CURRENT_TIME, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+      VALUES ($1, $2, CURRENT_DATE, CURRENT_TIME, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
       ON CONFLICT (user_id, entry_date, entry_time)
       DO UPDATE SET
         mood_score = EXCLUDED.mood_score,
@@ -43,7 +61,9 @@ class MoodEntry {
         social_interaction_quality = EXCLUDED.social_interaction_quality,
         notes = EXCLUDED.notes,
         activities = EXCLUDED.activities,
-        triggers = EXCLUDED.triggers
+        triggers = EXCLUDED.triggers,
+        is_encrypted = EXCLUDED.is_encrypted,
+        is_e2ee_encrypted = EXCLUDED.is_e2ee_encrypted
       RETURNING *
     `;
 
@@ -57,17 +77,19 @@ class MoodEntry {
       sleepHours,
       anxietyLevel,
       socialInteractionQuality,
-      encryptedNotes,
+      notesForDb,
       JSON.stringify(activities || []),
       JSON.stringify(triggers || []),
-      notes ? true : false
+      isLegacyEncrypted,
+      finalE2EEFlag
     ];
 
     const result = await db.query(query, values);
     const entry = result.rows[0];
 
-    // Decrypt notes for response
-    if (entry.is_encrypted && entry.notes) {
+    // Server-side decrypt ONLY for the legacy path. E2EE entries pass the
+    // opaque ciphertext back to the client for client-side decryption.
+    if (entry.is_encrypted && entry.notes && !entry.is_e2ee_encrypted) {
       entry.notes = decrypt(entry.notes);
     }
 
@@ -105,7 +127,7 @@ class MoodEntry {
 
     // Decrypt notes in entries
     return result.rows.map(entry => {
-      if (entry.is_encrypted && entry.notes) {
+      if (entry.is_encrypted && entry.notes && !entry.is_e2ee_encrypted) {
         entry.notes = decrypt(entry.notes);
       }
       return entry;
@@ -128,7 +150,7 @@ class MoodEntry {
     }
 
     const entry = result.rows[0];
-    if (entry.is_encrypted && entry.notes) {
+    if (entry.is_encrypted && entry.notes && !entry.is_e2ee_encrypted) {
       entry.notes = decrypt(entry.notes);
     }
 
@@ -149,14 +171,27 @@ class MoodEntry {
     const values = [];
     let paramCount = 1;
 
+    // Phase 1.3 step 5+7 (ADR-0009): the same E2EE branching as create().
+    // If `is_e2ee_encrypted` is set in the update payload, the `notes` value
+    // is treated as opaque ciphertext and stored unchanged.
+    const updateIsE2EE = updates.is_e2ee_encrypted === true;
     Object.keys(updates).forEach(key => {
+      if (key === 'is_e2ee_encrypted') return; // consumed above
       if (allowedFields.includes(key) && updates[key] !== undefined) {
         if (key === 'notes') {
           fields.push(`${key} = $${paramCount}`);
           fields.push(`is_encrypted = $${paramCount + 1}`);
-          values.push(encrypt(updates[key]));
-          values.push(true);
-          paramCount += 2;
+          fields.push(`is_e2ee_encrypted = $${paramCount + 2}`);
+          if (updateIsE2EE) {
+            values.push(updates[key]);          // opaque blob, store as-is
+            values.push(false);                 // not legacy-server-encrypted
+            values.push(true);                  // flag the row as E2EE
+          } else {
+            values.push(encrypt(updates[key])); // legacy server encrypt
+            values.push(true);
+            values.push(false);
+          }
+          paramCount += 3;
         } else if (key === 'activities' || key === 'triggers') {
           fields.push(`${key} = $${paramCount}`);
           values.push(JSON.stringify(updates[key]));
@@ -188,7 +223,7 @@ class MoodEntry {
     }
 
     const entry = result.rows[0];
-    if (entry.is_encrypted && entry.notes) {
+    if (entry.is_encrypted && entry.notes && !entry.is_e2ee_encrypted) {
       entry.notes = decrypt(entry.notes);
     }
 

@@ -133,7 +133,12 @@ const StreakDisplay = ({ currentStreak = 0, longestStreak = 0, totalCheckIns = 0
  * AchievementBadge - Individual achievement display
  */
 export const AchievementBadge = ({ icon, title, description, isEarned = false, earnedAt }) => {
+  // 2026-06-16: visual rework. Previously locked badges used a dashed
+  // border + grayscale which read as "interactive tile" to new users.
+  // Now: solid soft border + corner 🔒 + visible description text → makes
+  // it obvious these are goals to earn, not navigation links.
   const badgeStyle = {
+    position: 'relative',
     display: 'flex',
     flexDirection: 'column',
     alignItems: 'center',
@@ -141,10 +146,10 @@ export const AchievementBadge = ({ icon, title, description, isEarned = false, e
     background: isEarned ? 'var(--surface)' : 'var(--background)',
     borderRadius: 'var(--radius-lg)',
     boxShadow: isEarned ? 'var(--shadow-sm)' : 'none',
-    border: isEarned ? 'none' : '2px dashed var(--border)',
+    border: isEarned ? 'none' : '1px solid var(--border)',
     transition: 'all var(--transition-base)',
-    opacity: isEarned ? 1 : 0.5,
-    filter: isEarned ? 'none' : 'grayscale(100%)',
+    opacity: isEarned ? 1 : 0.7,
+    filter: isEarned ? 'none' : 'grayscale(60%)',
     minWidth: '100px',
     textAlign: 'center'
   };
@@ -161,18 +166,29 @@ export const AchievementBadge = ({ icon, title, description, isEarned = false, e
     marginBottom: '2px'
   };
 
-  const _descriptionStyle = {
+  const descriptionStyle = {
     fontSize: '0.7rem',
     color: 'var(--text-secondary)',
-    lineHeight: 1.3
+    lineHeight: 1.3,
+    marginTop: '4px'
+  };
+
+  const lockBadgeStyle = {
+    position: 'absolute',
+    top: 4, right: 6,
+    fontSize: '0.7rem',
+    opacity: 0.5
   };
 
   return (
     <div style={badgeStyle} title={isEarned ? `Earned: ${new Date(earnedAt).toLocaleDateString()}` : description}>
+      {!isEarned && <span style={lockBadgeStyle} aria-hidden="true">🔒</span>}
       <span style={iconStyle}>{icon}</span>
       <span style={titleStyle}>{title}</span>
-      {isEarned && (
-        <span style={{ fontSize: '0.65rem', color: 'var(--success-color)' }}>Earned!</span>
+      {isEarned ? (
+        <span style={{ fontSize: '0.65rem', color: 'var(--success-color)', marginTop: 2 }}>Earned!</span>
+      ) : (
+        <span style={descriptionStyle}>{description}</span>
       )}
     </div>
   );
@@ -232,6 +248,14 @@ export const AchievementsGrid = ({ achievements = [], userAchievements = [] }) =
     gap: 'var(--spacing-md)'
   };
 
+  const introStyle = {
+    fontSize: 'var(--font-size-small)',
+    color: 'var(--text-secondary)',
+    marginTop: 'calc(-1 * var(--spacing-sm))',
+    marginBottom: 'var(--spacing-lg)',
+    lineHeight: 1.45
+  };
+
   return (
     <div style={containerStyle}>
       <div style={headerStyle}>
@@ -239,9 +263,12 @@ export const AchievementsGrid = ({ achievements = [], userAchievements = [] }) =
           <span>🏅</span> Achievements
         </h3>
         <span style={countStyle}>
-          {earnedCodes.size}/{displayAchievements.length} earned
+          {earnedCodes.size} of {displayAchievements.length} unlocked
         </span>
       </div>
+      <p style={introStyle}>
+        Goals you&rsquo;ll earn as you use Mindspace. Each badge shows how to get it &mdash; no need to click.
+      </p>
 
       <div style={gridStyle}>
         {displayAchievements.map((achievement, index) => {

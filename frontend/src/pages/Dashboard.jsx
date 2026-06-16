@@ -4,6 +4,7 @@ import Navigation from '../components/Navigation';
 import StreakDisplay, { AchievementsGrid } from '../components/StreakDisplay';
 import MoodForecast from '../components/MoodForecast';
 import SetUpEncryption from '../components/SetUpEncryption';
+import UnlockEncryption from '../components/UnlockEncryption';
 import { useAuth } from '../context/AuthContext';
 import { moodAPI, insightsAPI, recommendationsAPI, gamificationAPI } from '../services/api';
 
@@ -129,6 +130,10 @@ const Dashboard = () => {
           Renders nothing for users already enrolled or who dismissed.
           Never blocks the Dashboard render path — modal overlay only. */}
       <SetUpEncryption />
+      {/* Phase 1.3 step 4 (2026-06-16): unlock-on-login modal. Renders only
+          when the user IS enrolled (metadata 200) AND the master key is
+          not cached. Skip is per-tab sessionStorage. */}
+      <UnlockEncryption />
       <main id="main-content" className="container" style={{ paddingTop: 'var(--spacing-xl)', paddingBottom: 'var(--spacing-xxl)' }}>
 
         {/* Safety Alert (if any) */}

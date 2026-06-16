@@ -3,8 +3,13 @@ import { Link } from 'react-router-dom';
 import Navigation from '../components/Navigation';
 import StreakDisplay, { AchievementsGrid } from '../components/StreakDisplay';
 import MoodForecast from '../components/MoodForecast';
-import SetUpEncryption from '../components/SetUpEncryption';
-import UnlockEncryption from '../components/UnlockEncryption';
+// Phase 1.3 step 9 (ADR-0009): lazy-load the E2EE modals so their crypto
+// dependencies (~50 KB worth of argon2-browser + bip39 wordlist + util
+// code) only enter the bundle for users who actually need a modal.
+// Suspense fallback is null because the modals are overlays — invisible
+// chrome is fine while they hydrate.
+const SetUpEncryption  = React.lazy(() => import('../components/SetUpEncryption'));
+const UnlockEncryption = React.lazy(() => import('../components/UnlockEncryption'));
 import { useAuth } from '../context/AuthContext';
 import { moodAPI, insightsAPI, recommendationsAPI, gamificationAPI } from '../services/api';
 
@@ -126,14 +131,15 @@ const Dashboard = () => {
   return (
     <div style={pageStyle}>
       <Navigation />
-      {/* Phase 1.3 (2026-06-16): dismissible first-login E2EE setup prompt.
-          Renders nothing for users already enrolled or who dismissed.
-          Never blocks the Dashboard render path — modal overlay only. */}
-      <SetUpEncryption />
-      {/* Phase 1.3 step 4 (2026-06-16): unlock-on-login modal. Renders only
-          when the user IS enrolled (metadata 200) AND the master key is
-          not cached. Skip is per-tab sessionStorage. */}
-      <UnlockEncryption />
+      {/* Phase 1.3 (2026-06-16): dismissible first-login E2EE setup prompt
+          and unlock-on-login modal. Lazy-loaded; Suspense fallback is null
+          because they are overlays — invisible while the chunk arrives is
+          fine. SetUpEncryption renders when /api/e2ee/metadata → 404 + not
+          dismissed; UnlockEncryption renders when 200 + key not cached. */}
+      <React.Suspense fallback={null}>
+        <SetUpEncryption />
+        <UnlockEncryption />
+      </React.Suspense>
       <main id="main-content" className="container" style={{ paddingTop: 'var(--spacing-xl)', paddingBottom: 'var(--spacing-xxl)' }}>
 
         {/* Safety Alert (if any) */}

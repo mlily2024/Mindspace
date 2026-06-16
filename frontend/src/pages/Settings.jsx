@@ -2,7 +2,9 @@ import React, { useState, useEffect } from 'react';
 import Navigation from '../components/Navigation';
 import PrivacyNutritionLabel from '../components/PrivacyNutritionLabel';
 import AuditLogVerification from '../components/AuditLogVerification';
-import UpgradeNotesToE2EE from '../components/UpgradeNotesToE2EE';
+// Phase 1.3 step 9: lazy-load the migration card so its key-management
+// dependency only enters the bundle when a user opens Settings.
+const UpgradeNotesToE2EE = React.lazy(() => import('../components/UpgradeNotesToE2EE'));
 import { useAuth } from '../context/AuthContext';
 import { authAPI } from '../services/api';
 import pushService from '../services/pushService';
@@ -501,7 +503,9 @@ const PrivacySettings = ({ user: _user, setSuccess }) => {
 
       {/* Phase 1.3 step 8 (ADR-0009): upgrade legacy server-encrypted notes
           to E2EE. Self-hides if the user has not completed E2EE setup. */}
-      <UpgradeNotesToE2EE />
+      <React.Suspense fallback={null}>
+        <UpgradeNotesToE2EE />
+      </React.Suspense>
 
       {/* On-device sentiment opt-in (ADR-0006) */}
       <OnDeviceSentimentToggle />

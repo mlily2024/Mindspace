@@ -4,11 +4,22 @@ const { body } = require('express-validator');
 const authController = require('../controllers/authController');
 const { authenticateToken } = require('../middleware/auth');
 const validate = require('../middleware/validation');
+const { isCommonPassword } = require('../utils/commonPasswords');
 
 // Validation rules
+// 2026-06-17 — password validation aligned with NIST SP 800-63B (2017+):
+//   length-floor (8) + common-password blocklist, NO complexity rules.
+//   See backend/src/utils/commonPasswords.js for rationale.
 const registerValidation = [
   body('email').optional().isEmail().withMessage('Valid email required'),
-  body('password').isLength({ min: 8 }).withMessage('Password must be at least 8 characters'),
+  body('password')
+    .isLength({ min: 8 }).withMessage('Password must be at least 8 characters')
+    .custom((value) => {
+      if (isCommonPassword(value)) {
+        throw new Error('This password is too common — please choose a less guessable one');
+      }
+      return true;
+    }),
   body('username').optional().isLength({ min: 3, max: 50 }).withMessage('Username must be 3-50 characters'),
   body('userGroup').optional({ values: 'null' }).isIn(['student', 'professional', 'parent', 'elderly', 'other']).withMessage('User group must be one of: student, professional, parent, elderly, or other')
 ];

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { evaluatePassword } from '../utils/passwordStrength';
 
 const Register = () => {
   const [formData, setFormData] = useState({
@@ -28,8 +29,16 @@ const Register = () => {
     setError('');
     setLoading(true);
 
-    if (formData.password.length < 8) {
-      setError('Password must be at least 8 characters');
+    // 2026-06-17: NIST 800-63B aligned validation. Reject too-short OR
+    // common-password matches client-side; backend re-validates the same
+    // rules so a bypass cannot create a weak account.
+    const strength = evaluatePassword(formData.password);
+    if (strength.blocking) {
+      setError(
+        strength.tier === 'too-short'
+          ? 'Password must be at least 8 characters'
+          : 'This password is too common — please choose a less guessable one'
+      );
       setLoading(false);
       return;
     }
@@ -253,6 +262,7 @@ const Register = () => {
                 {showPassword ? '🙈' : '👁️'}
               </button>
             </div>
+            <PasswordStrengthMeter password={formData.password} />
           </div>
 
           {/* Confirm Password — typo guard, added 2026-06-16. Visibility
@@ -345,6 +355,46 @@ const Register = () => {
             Your data is encrypted and private. We never share your personal information.
           </p>
         </div>
+      </div>
+    </div>
+  );
+};
+
+// PasswordStrengthMeter — 2026-06-17, ADR-0010. Live tier indicator
+// (too-short / common / weak / OK / strong / very strong) rendered under
+// the Password field. Uses evaluatePassword() so the logic is shared with
+// handleSubmit's gate above. Renders nothing when the field is empty.
+const PasswordStrengthMeter = ({ password }) => {
+  const { tier, label, bars, hint } = evaluatePassword(password);
+  if (tier === 'empty') return null;
+
+  const color =
+    tier === 'too-short' || tier === 'common' || tier === 'weak' ? '#c53030' :
+    tier === 'medium'      ? '#dd6b20' :
+    tier === 'strong'      ? '#38a169' :
+    tier === 'very-strong' ? '#22543d' :
+    '#718096';
+
+  const segmentBase = {
+    flex: 1,
+    height: 4,
+    borderRadius: 2,
+    background: 'var(--border, #e2e8f0)'
+  };
+
+  return (
+    <div style={{ marginTop: 'var(--spacing-xs)' }} aria-live="polite">
+      <div style={{ display: 'flex', gap: 4, marginBottom: 4 }}>
+        {[1, 2, 3, 4].map(n => (
+          <div
+            key={n}
+            style={{ ...segmentBase, background: n <= bars ? color : segmentBase.background }}
+          />
+        ))}
+      </div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.82em' }}>
+        <span style={{ color, fontWeight: 600 }}>{label}</span>
+        {hint && <span style={{ color: 'var(--text-secondary)' }}>{hint}</span>}
       </div>
     </div>
   );

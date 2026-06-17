@@ -137,6 +137,14 @@ export const moodAPI = {
   getTrends: (params) => api.get('/mood/trends', { params })
 };
 
+// Journal API (W2 polish 2026-06-17) — Journal page was a UI prototype
+// until this commit. Persistence now real; E2EE matches the mood-entry shape.
+export const journalAPI = {
+  create: (entry) => api.post('/journal', entry),
+  getAll: (params) => api.get('/journal', { params }),
+  delete: (entryId) => api.delete(`/journal/${entryId}`)
+};
+
 // Insights API
 export const insightsAPI = {
   generate: () => api.post('/insights/generate'),

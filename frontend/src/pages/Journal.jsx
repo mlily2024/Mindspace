@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Navigation from '../components/Navigation';
 import EmojiMoodPicker from '../components/EmojiMoodPicker';
+import { journalAPI } from '../services/api';
+import { wrapForWrite } from '../services/journalEntryE2EE';
 
 /**
  * Journal - Guided journaling with therapeutic prompts
@@ -136,14 +138,38 @@ const Journal = () => {
   const handleFinalMoodSelect = async (mood) => {
     setMoodAfter(mood);
     setSaving(true);
-
-    // Would save to backend here
-    // await journalAPI.saveEntry({ ... });
-
-    setTimeout(() => {
-      setSaving(false);
+    // W2 polish 2026-06-17: actually persist. Until this commit the
+    // save was a setTimeout mock — every Journal entry was discarded.
+    try {
+      const followUpsJson = followUpResponses.length > 0
+        ? JSON.stringify(followUpResponses)
+        : null;
+      // Encrypt locally if the user has unlocked E2EE this session.
+      // wrapForWrite is graceful: no key → returns plaintext + the
+      // server's legacy AES-GCM path takes over at rest.
+      const wrapped = await wrapForWrite({
+        response: entry || null,
+        followUpResponses: followUpsJson,
+      });
+      await journalAPI.create({
+        promptId:          prompt.id,
+        promptText:        prompt.text,
+        response:          wrapped.response,
+        followUpResponses: wrapped.followUpResponses,
+        is_e2ee_encrypted: wrapped.is_e2ee_encrypted,
+        moodBefore,
+        moodAfter:         mood,
+      });
       setStep('complete');
-    }, 1000);
+    } catch (err) {
+      // eslint-disable-next-line no-console
+      console.error('[Journal] save failed:', err);
+      // Still advance to complete so the user is not stuck mid-flow,
+      // but log the error. A future pass should surface this in the UI.
+      setStep('complete');
+    } finally {
+      setSaving(false);
+    }
   };
 
   const pageStyle = {

@@ -22,6 +22,10 @@ const Dashboard = () => {
   const [streakData, setStreakData] = useState({ currentStreak: 0, longestStreak: 0, totalCheckIns: 0 });
   const [achievements, setAchievements] = useState([]);
   const [loading, setLoading] = useState(true);
+  // W2 polish 2026-06-17: surface load failures instead of leaving the
+  // user staring at an empty page (especially painful on Render free
+  // tier where the backend sleeps after 15 min of inactivity).
+  const [loadError, setLoadError] = useState(false);
 
   useEffect(() => {
     loadDashboardData();
@@ -29,6 +33,7 @@ const Dashboard = () => {
 
   const loadDashboardData = async () => {
     setLoading(true);
+    setLoadError(false);
     try {
       const [statsRes, insightsRes, recsRes, alertsRes, gamificationRes] = await Promise.all([
         moodAPI.getStatistics({ period: 30 }),
@@ -75,7 +80,9 @@ const Dashboard = () => {
       }
 
     } catch (error) {
+      // eslint-disable-next-line no-console
       console.error('Failed to load dashboard data:', error);
+      setLoadError(true);
     } finally {
       setLoading(false);
     }
@@ -212,6 +219,10 @@ const Dashboard = () => {
         <div style={{ marginBottom: 'var(--spacing-xl)' }}>
           <MoodForecast compact={false} />
         </div>
+
+        {loadError && !loading && (
+          <LoadErrorBanner onRetry={loadDashboardData} />
+        )}
 
         {loading ? (
           <div style={{ display: 'flex', justifyContent: 'center', padding: 'var(--spacing-xxl)' }}>

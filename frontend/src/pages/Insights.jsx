@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Navigation from '../components/Navigation';
 import MoodCalendar from '../components/MoodCalendar';
+import LoadErrorBanner from '../components/LoadErrorBanner';
 import { insightsAPI } from '../services/api';
 
 /**
@@ -16,6 +17,9 @@ const Insights = () => {
   const [loading, setLoading] = useState(true);
   const [timeRange, setTimeRange] = useState(30);
   const [generating, setGenerating] = useState(false);
+  // W2 polish 2026-06-17: surface API load failures via LoadErrorBanner
+  // instead of leaving the page showing a blank empty-data state.
+  const [loadError, setLoadError] = useState(false);
 
   useEffect(() => {
     loadAllData();
@@ -23,6 +27,7 @@ const Insights = () => {
 
   const loadAllData = async () => {
     setLoading(true);
+    setLoadError(false);
     try {
       const [patternsRes, insightsRes, alertsRes] = await Promise.all([
         insightsAPI.getPatterns(timeRange),
@@ -34,7 +39,9 @@ const Insights = () => {
       setInsights(insightsRes.data.insights || []);
       setSafetyAlerts(alertsRes.data.alerts || []);
     } catch (error) {
+      // eslint-disable-next-line no-console
       console.error('Failed to load insights:', error);
+      setLoadError(true);
     } finally {
       setLoading(false);
     }
@@ -164,6 +171,19 @@ const Insights = () => {
               Analysing your patterns...
             </p>
           </div>
+        </main>
+      </div>
+    );
+  }
+
+  // W2 polish 2026-06-17: load-failure screen with a retry instead of
+  // silently rendering a blank patterns/insights page.
+  if (loadError) {
+    return (
+      <div style={pageStyle}>
+        <Navigation />
+        <main style={containerStyle}>
+          <LoadErrorBanner onRetry={loadAllData} />
         </main>
       </div>
     );

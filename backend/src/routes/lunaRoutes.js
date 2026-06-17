@@ -11,7 +11,11 @@ router.use(authenticateToken);
 // Validation rules
 const messageValidation = [
   body('message').isString().isLength({ min: 1, max: 2000 }).withMessage('Message must be 1-2000 characters'),
-  body('sessionId').optional().isUUID().withMessage('Session ID must be a valid UUID')
+  // 2026-06-17: `.optional({ values: 'null' })` so the first message of a
+  // conversation (where the client doesn't yet have a session UUID and
+  // sends `sessionId: null`) passes validation. Without this the very
+  // first POST is rejected with 400 and Luna can never start.
+  body('sessionId').optional({ values: 'null' }).isUUID().withMessage('Session ID must be a valid UUID')
 ];
 
 const journalValidation = [

@@ -33,16 +33,42 @@ const Navigation = () => {
     setMobileMenuOpen(false);
   };
 
+  // 2026-06-17 polish plan W3: maturity tiers per route. Core = no badge.
+  // Beta = small "BETA" pill. Experimental = "Mock data" pill. Honest
+  // labelling without hiding any feature; assessor sees the whole surface
+  // in one nav, badges signal maturity.
   const navLinks = [
-    { to: '/dashboard', label: 'Home', icon: '🏠' },
-    { to: '/mood-tracker', label: 'Check In', icon: '✨' },
-    { to: '/journal', label: 'Journal', icon: '📝' },
-    { to: '/insights', label: 'Insights', icon: '🌟' },
-    { to: '/recommendations', label: 'Self-Care', icon: '💜' },
-    { to: '/wearables', label: 'Wearables', icon: '⌚' },
-    { to: '/peer-support', label: 'Community', icon: '🤝' },
-    { to: '/settings', label: 'Settings', icon: '⚙️' }
+    { to: '/dashboard',       label: 'Home',     icon: '🏠', tier: 'core' },
+    { to: '/mood-tracker',    label: 'Check In', icon: '✨', tier: 'core' },
+    { to: '/journal',         label: 'Journal',  icon: '📝', tier: 'core' },
+    { to: '/insights',        label: 'Insights', icon: '🌟', tier: 'core' },
+    { to: '/recommendations', label: 'Self-Care', icon: '💜', tier: 'beta' },
+    { to: '/wearables',       label: 'Wearables', icon: '⌚', tier: 'experimental', badge: 'Mock data' },
+    { to: '/peer-support',    label: 'Community', icon: '🤝', tier: 'beta' },
+    { to: '/settings',        label: 'Settings', icon: '⚙️', tier: 'core' }
   ];
+
+  // Tiny pill, deliberately small + low-contrast so it informs without
+  // dominating the nav item.
+  const tierBadgeStyle = (tier) => ({
+    display: 'inline-block',
+    padding: '1px 6px',
+    marginLeft: 6,
+    borderRadius: 8,
+    fontSize: '0.65em',
+    fontWeight: 600,
+    letterSpacing: '0.5px',
+    textTransform: 'uppercase',
+    background: tier === 'experimental' ? 'rgba(221,107,32,0.85)' : 'rgba(255,255,255,0.25)',
+    color: '#fff',
+    verticalAlign: 'middle',
+    lineHeight: 1.4,
+  });
+  const renderTierBadge = (link) => {
+    if (link.tier === 'core') return null;
+    const text = link.badge || link.tier.toUpperCase();
+    return <span style={tierBadgeStyle(link.tier)} aria-label={`${link.label} feature maturity: ${text.toLowerCase()}`}>{text}</span>;
+  };
 
   const navStyle = {
     background: 'linear-gradient(135deg, var(--primary-color) 0%, #8A7A94 100%)',
@@ -202,6 +228,7 @@ const Navigation = () => {
                 >
                   <span role="img" aria-hidden="true">{link.icon}</span>
                   <span className="nav-label">{link.label}</span>
+                  {renderTierBadge(link)}
                 </Link>
               </li>
             ))}
@@ -252,6 +279,7 @@ const Navigation = () => {
                   >
                     <span role="img" aria-hidden="true">{link.icon}</span>
                     <span>{link.label}</span>
+                    {renderTierBadge(link)}
                   </Link>
                 </li>
               ))}

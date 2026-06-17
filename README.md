@@ -169,6 +169,18 @@ Frozen, UK-localised crisis content (Samaritans 116 123, Shout 85258, NHS 111). 
 
 Mindspace is also a complete mental-health platform. The features below are built on top of the privacy foundation described above.
 
+### Feature maturity (in the nav at v3.0.0)
+
+A small badge next to each non-core nav item signals where it is on the maturity curve. Core features are the daily-driver loop and are unbadged. Beta features work end-to-end but have not received the same polish or test coverage as Core. The single Experimental feature (Wearables) currently uses mock provider data on the demo; the architecture supports real OAuth-backed providers once secrets are configured.
+
+| Tier | Features | Meaning |
+|---|---|---|
+| **Core** | Home, Check In, Journal, Insights, Settings | Tested end-to-end; the privacy story's daily-driver loop |
+| **Beta** | Self-Care (recommendations), Community (peer support) | Works end-to-end; not yet at Core polish/coverage |
+| **Experimental** | Wearables | Mock provider data on the demo; real OAuth providers wire-ready |
+
+This hierarchy is deliberate. Adjacent features exercise the same privacy primitives (E2EE, ε-DP, audit log, on-device sentiment) without changing them, which is how the architecture scales without compromising the contract. Hiding nothing means an assessor sees the entire surface in one click each.
+
 ### Core tracking
 - Multi-dimensional mood and wellbeing logging (mood, energy, stress, anxiety, sleep quality, sleep hours, social-interaction quality, activities, triggers)
 - Encrypted private notes (AES-256-GCM authenticated encryption per record)

@@ -265,9 +265,11 @@ const Register = () => {
             <PasswordStrengthMeter password={formData.password} />
           </div>
 
-          {/* Confirm Password — typo guard, added 2026-06-16. Visibility
-              follows the same showPassword toggle as the password field so
-              users only flip one switch to verify both values. */}
+          {/* Confirm Password — typo guard. Visibility follows the same
+              showPassword toggle as the password field, AND has its own
+              eye button next to it (2026-06-17) so the user can peek from
+              whichever field their cursor is in. The two buttons drive
+              the same state so flipping either reveals both. */}
           <div style={{ marginBottom: 'var(--spacing-xl)' }}>
             <label
               htmlFor="confirmPassword"
@@ -280,18 +282,38 @@ const Register = () => {
             >
               Confirm Password
             </label>
-            <input
-              type={showPassword ? 'text' : 'password'}
-              id="confirmPassword"
-              style={inputStyle}
-              value={formData.confirmPassword}
-              onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })}
-              required
-              minLength="8"
-              autoComplete="new-password"
-              aria-required="true"
-              placeholder="Type the same password again"
-            />
+            <div style={{ position: 'relative' }}>
+              <input
+                type={showPassword ? 'text' : 'password'}
+                id="confirmPassword"
+                style={{ ...inputStyle, paddingRight: '50px' }}
+                value={formData.confirmPassword}
+                onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })}
+                required
+                minLength="8"
+                autoComplete="new-password"
+                aria-required="true"
+                placeholder="Type the same password again"
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                style={{
+                  position: 'absolute',
+                  right: '12px',
+                  top: '50%',
+                  transform: 'translateY(-50%)',
+                  background: 'none',
+                  border: 'none',
+                  cursor: 'pointer',
+                  padding: 'var(--spacing-xs)',
+                  color: 'var(--text-secondary)'
+                }}
+                aria-label={showPassword ? 'Hide password' : 'Show password'}
+              >
+                {showPassword ? '🙈' : '👁️'}
+              </button>
+            </div>
             {formData.confirmPassword.length > 0 &&
              formData.password !== formData.confirmPassword && (
               <p style={{

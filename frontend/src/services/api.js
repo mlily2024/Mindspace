@@ -89,7 +89,12 @@ api.interceptors.response.use(
         isRefreshing = false;
       }
     }
-    return Promise.reject(error.response?.data || { message: error.message });
+    // 2026-06-17: surface the HTTP status code on the rejected payload so
+    // call sites can branch on it. Previously only the body was returned,
+    // which silently masked 404 detection (e.g. SetUpEncryption needed to
+    // know when /api/e2ee/metadata had no row yet to surface the wizard).
+    const body = error.response?.data || { message: error.message };
+    return Promise.reject({ ...body, status: error.response?.status });
   }
 );
 

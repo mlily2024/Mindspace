@@ -56,7 +56,12 @@ const SetUpEncryption = () => {
           localStorage.setItem(DISMISS_KEY, 'already-set-up');
         }
       } catch (e) {
-        const status = e && e.response && e.response.status;
+        // 2026-06-17: api.js's response interceptor flattens rejections,
+        // so the HTTP status now lives on e.status (preserved by the
+        // interceptor since the same date). Previously we read
+        // e.response.status, which was always undefined post-interceptor,
+        // so the 404 branch never fired and the wizard never appeared.
+        const status = e && e.status;
         if (status === 404) {
           // Not set up — surface the intro.
           if (!cancelled) setPhase('intro');

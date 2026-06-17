@@ -8,7 +8,8 @@
     "dev": "nodemon src/server.js",
     "test": "jest --coverage",
     "lint": "eslint src --ext .js",
-    "lint:fix": "eslint src --ext .js --fix"
+    "lint:fix": "eslint src --ext .js --fix",
+    "audit:schema": "node scripts/audit-schema-drift.js"
   },
   "keywords": [
     "mental-health",

@@ -97,6 +97,9 @@ jobs:
       - name: Lint
         run: npm run lint
 
+      - name: Schema-drift audit (Core/Beta must match migrations)
+        run: npm run audit:schema
+
       - name: Test (with coverage)
         run: npm test -- --ci --reporters=default --coverage
 

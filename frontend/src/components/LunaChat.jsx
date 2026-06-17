@@ -183,7 +183,14 @@ const LunaChat = () => {
   };
 
   const handleTryTechnique = (technique) => {
-    setInputValue(`I'd like to try "${technique.title}"`);
+    // 2026-06-17: backend lunaService sends { type, name } in
+    // suggestedTechnique, not { title }. The old `.title` lookup was
+    // undefined, so the autofilled text became literally
+    //   I'd like to try "undefined"
+    // Fall through title → name → 'this technique' so a missing field
+    // never surfaces as the JS undefined value.
+    const label = technique?.title || technique?.name || 'this technique';
+    setInputValue(`I'd like to try "${label}"`);
     setTimeout(() => handleSend(), 100);
   };
 

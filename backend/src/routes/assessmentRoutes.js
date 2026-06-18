@@ -19,13 +19,19 @@ const instrumentValidation = [
     .withMessage(`Instrument must be one of: ${validInstruments.join(', ')}`)
 ];
 
+// 2026-06-18: dropped body('assessmentId').isUUID() — the frontend never
+// sends one (the server generates the UUID inside ValidatedAssessment.create)
+// and the old requirement caused every submit to 400 before reaching the
+// controller. Optional `note` accepted for free-text annotation; capped at
+// 4000 chars to match the schema's TEXT bound expectations.
 const submitValidation = [
   param('instrument')
     .isString()
     .isIn(validInstruments)
     .withMessage(`Instrument must be one of: ${validInstruments.join(', ')}`),
-  body('assessmentId').isUUID().withMessage('Invalid assessment ID'),
-  body('answers').isArray({ min: 1 }).withMessage('Answers must be a non-empty array')
+  body('answers').isArray({ min: 1 }).withMessage('Answers must be a non-empty array'),
+  body('note').optional({ values: 'null' }).isString().isLength({ max: 4000 })
+    .withMessage('Note must be a string up to 4000 characters'),
 ];
 
 const historyValidation = [

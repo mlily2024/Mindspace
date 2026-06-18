@@ -34,9 +34,25 @@ router.post('/register', registerValidation, validate, authController.register);
 router.post('/login', loginValidation, validate, authController.login);
 router.post('/refresh', authController.refreshToken);
 
+// 2026-06-18: in-app password change. Same length + blocklist validation
+// as registration (matches NIST 800-63B alignment shipped in commit
+// 8f86826). Current-password verification happens in the controller.
+const changePasswordValidation = [
+  body('currentPassword').isString().isLength({ min: 1 }).withMessage('Current password is required'),
+  body('newPassword')
+    .isLength({ min: 8 }).withMessage('New password must be at least 8 characters')
+    .custom((value) => {
+      if (isCommonPassword(value)) {
+        throw new Error('This password is too common — please choose a less guessable one');
+      }
+      return true;
+    }),
+];
+
 // Protected routes
 router.get('/profile', authenticateToken, authController.getProfile);
 router.put('/profile', authenticateToken, authController.updateProfile);
+router.put('/password', authenticateToken, changePasswordValidation, validate, authController.changePassword);
 router.put('/preferences', authenticateToken, authController.updatePreferences);
 router.delete('/account', authenticateToken, authController.deleteAccount);
 router.post('/data-export', authenticateToken, authController.requestDataExport);

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { evaluatePassword } from '../utils/passwordStrength';
+import PasswordStrengthMeter from '../components/PasswordStrengthMeter';
 
 const Register = () => {
   const [formData, setFormData] = useState({
@@ -377,46 +378,6 @@ const Register = () => {
             Your data is encrypted and private. We never share your personal information.
           </p>
         </div>
-      </div>
-    </div>
-  );
-};
-
-// PasswordStrengthMeter — 2026-06-17, ADR-0010. Live tier indicator
-// (too-short / common / weak / OK / strong / very strong) rendered under
-// the Password field. Uses evaluatePassword() so the logic is shared with
-// handleSubmit's gate above. Renders nothing when the field is empty.
-const PasswordStrengthMeter = ({ password }) => {
-  const { tier, label, bars, hint } = evaluatePassword(password);
-  if (tier === 'empty') return null;
-
-  const color =
-    tier === 'too-short' || tier === 'common' || tier === 'weak' ? '#c53030' :
-    tier === 'medium'      ? '#dd6b20' :
-    tier === 'strong'      ? '#38a169' :
-    tier === 'very-strong' ? '#22543d' :
-    '#718096';
-
-  const segmentBase = {
-    flex: 1,
-    height: 4,
-    borderRadius: 2,
-    background: 'var(--border, #e2e8f0)'
-  };
-
-  return (
-    <div style={{ marginTop: 'var(--spacing-xs)' }} aria-live="polite">
-      <div style={{ display: 'flex', gap: 4, marginBottom: 4 }}>
-        {[1, 2, 3, 4].map(n => (
-          <div
-            key={n}
-            style={{ ...segmentBase, background: n <= bars ? color : segmentBase.background }}
-          />
-        ))}
-      </div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.82em' }}>
-        <span style={{ color, fontWeight: 600 }}>{label}</span>
-        {hint && <span style={{ color: 'var(--text-secondary)' }}>{hint}</span>}
       </div>
     </div>
   );

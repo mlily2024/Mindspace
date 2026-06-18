@@ -86,6 +86,19 @@ class User {
   }
 
   /**
+   * Update the user's password. Always re-hashes via bcrypt with cost 10
+   * (matches the registration path on line 11). Caller is responsible for
+   * verifying the OLD password first via verifyPassword().
+   */
+  static async updatePassword(userId, newPlainPassword) {
+    const newHash = await bcrypt.hash(newPlainPassword, 10);
+    await db.query(
+      `UPDATE users SET password_hash = $1, updated_at = CURRENT_TIMESTAMP WHERE user_id = $2`,
+      [newHash, userId]
+    );
+  }
+
+  /**
    * Update last login timestamp
    */
   static async updateLastLogin(userId) {

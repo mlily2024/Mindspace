@@ -295,6 +295,59 @@ const permanentDeleteAccount = async (req, res, next) => {
  * Accepts an expired (or valid) token and issues a new one,
  * as long as the token signature is authentic and payload is well-formed.
  */
+/**
+ * PUT /api/auth/password — in-app password change (S2, 2026-06-18).
+ *
+ * Body: { currentPassword, newPassword }
+ *
+ * Verifies the current password (bcrypt compare against stored hash),
+ * then updates to the new password. Validation of the NEW password's
+ * shape (length floor + common-password blocklist) is enforced by the
+ * route's express-validator chain in authRoutes.js, matching the
+ * registration path shipped in 8f86826.
+ *
+ * Generic error message on current-password failure to avoid leaking
+ * whether a user ID exists or has any particular hash.
+ */
+const changePassword = async (req, res, next) => {
+  try {
+    const { currentPassword, newPassword } = req.body;
+    const userId = req.user.userId;
+
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(401).json({
+        success: false,
+        message: 'Could not verify your account.',
+      });
+    }
+
+    const ok = await User.verifyPassword(currentPassword, user.password_hash);
+    if (!ok) {
+      logger.warn('Password change rejected: current password incorrect', { userId });
+      return res.status(401).json({
+        success: false,
+        message: 'Current password is incorrect.',
+      });
+    }
+
+    if (currentPassword === newPassword) {
+      return res.status(400).json({
+        success: false,
+        message: 'Your new password cannot be the same as your current password.',
+      });
+    }
+
+    await User.updatePassword(userId, newPassword);
+    logger.info('Password changed', { userId });
+
+    res.json({ success: true, message: 'Password updated.' });
+  } catch (error) {
+    logger.error('Error changing password', { error: error.message });
+    next(error);
+  }
+};
+
 const refreshToken = async (req, res, next) => {
   try {
     const authHeader = req.headers['authorization'];
@@ -344,6 +397,7 @@ const refreshToken = async (req, res, next) => {
 module.exports = {
   register,
   login,
+  changePassword,
   refreshToken,
   getProfile,
   updateProfile,

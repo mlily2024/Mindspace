@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import Navigation from '../components/Navigation';
 import PrivacyNutritionLabel from '../components/PrivacyNutritionLabel';
 import AuditLogVerification from '../components/AuditLogVerification';
+import ChangePasswordForm from '../components/ChangePasswordForm';
 // Phase 1.3 step 9: lazy-load the migration card so its key-management
 // dependency only enters the bundle when a user opens Settings.
 const UpgradeNotesToE2EE = React.lazy(() => import('../components/UpgradeNotesToE2EE'));
@@ -175,6 +176,8 @@ const Settings = () => {
                 {loading ? 'Saving...' : 'Save Changes'}
               </button>
             </form>
+
+            <ChangePasswordForm />
           </div>
         )}
 

@@ -104,6 +104,12 @@ export const authAPI = {
   login: (credentials) => api.post('/auth/login', credentials),
   getProfile: () => api.get('/auth/profile'),
   updateProfile: (data) => api.put('/auth/profile', data),
+  // S2 (2026-06-18): in-app password change. Backend verifies the current
+  // password and re-validates the new one against the same length floor +
+  // blocklist used at registration. Server responds 401 for wrong current,
+  // 400 for weak/common/same-as-current, 200 with { success: true } on ok.
+  changePassword: ({ currentPassword, newPassword }) =>
+    api.put('/auth/password', { currentPassword, newPassword }),
   updatePreferences: (preferences) => api.put('/auth/preferences', preferences),
   deleteAccount: () => api.delete('/auth/account'),
   requestDataExport: () => api.post('/auth/data-export'),

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import Navigation from '../components/Navigation';
 import EmojiMoodPicker from '../components/EmojiMoodPicker';
 import { journalAPI } from '../services/api';
@@ -256,6 +256,16 @@ const Journal = () => {
           }}>
             <span role="img" aria-hidden="true">📝</span> Daily Reflection
           </h1>
+          {/* J1 (2026-06-18): always-visible link to history. Subtle by
+              design — does not compete with the prompt CTA. */}
+          <p style={{ marginTop: 'var(--spacing-xs)' }}>
+            <Link to="/journal/history" style={{
+              color: 'var(--primary-color)',
+              textDecoration: 'none',
+              fontSize: 'var(--font-size-small)',
+              fontWeight: 500,
+            }}>View past entries →</Link>
+          </p>
         </div>
 
         {/* Step: Initial Mood Check */}
@@ -491,15 +501,31 @@ const Journal = () => {
                 </div>
               </div>
 
-              <button
-                onClick={() => navigate('/dashboard')}
-                style={{
-                  ...buttonStyle,
-                  background: 'linear-gradient(135deg, var(--accent-color), var(--accent-hover))'
-                }}
-              >
-                Return to Dashboard
-              </button>
+              <div style={{ display: 'flex', gap: 'var(--spacing-md)', justifyContent: 'center', flexWrap: 'wrap' }}>
+                <button
+                  onClick={() => navigate('/dashboard')}
+                  style={{
+                    ...buttonStyle,
+                    background: 'linear-gradient(135deg, var(--accent-color), var(--accent-hover))',
+                    marginTop: 0,
+                  }}
+                >
+                  Return to Dashboard
+                </button>
+                {/* J1: cross-link to the history view after a successful entry */}
+                <button
+                  onClick={() => navigate('/journal/history')}
+                  style={{
+                    ...buttonStyle,
+                    background: 'var(--surface)',
+                    color: 'var(--text-primary)',
+                    border: '1px solid var(--border)',
+                    marginTop: 0,
+                  }}
+                >
+                  📝 View past entries
+                </button>
+              </div>
             </div>
           </div>
         )}

@@ -19,6 +19,7 @@ const Recommendations = lazy(() => import('./pages/Recommendations'));
 const Settings = lazy(() => import('./pages/Settings'));
 const CrisisResources = lazy(() => import('./pages/CrisisResources'));
 const Journal = lazy(() => import('./pages/Journal'));
+const JournalHistory = lazy(() => import('./pages/JournalHistory'));
 const PeerSupport = lazy(() => import('./pages/PeerSupport'));
 const AdminLogin = lazy(() => import('./pages/AdminLogin'));
 const AdminDashboard = lazy(() => import('./pages/AdminDashboard'));
@@ -114,6 +115,10 @@ const AppContent = () => {
           <Route
             path="/journal"
             element={<ProtectedRoute><Journal /></ProtectedRoute>}
+          />
+          <Route
+            path="/journal/history"
+            element={<ProtectedRoute><JournalHistory /></ProtectedRoute>}
           />
           <Route
             path="/insights"

@@ -5,6 +5,7 @@ import StreakDisplay, { AchievementsGrid } from '../components/StreakDisplay';
 import MoodForecast from '../components/MoodForecast';
 import LoadErrorBanner from '../components/LoadErrorBanner';
 import LastCheckInPill from '../components/LastCheckInPill';
+import ScreeningDuePill from '../components/ScreeningDuePill';
 // Phase 1.3 step 9 (ADR-0009): lazy-load the E2EE modals so their crypto
 // dependencies (~50 KB worth of argon2-browser + bip39 wordlist + util
 // code) only enter the bundle for users who actually need a modal.
@@ -205,6 +206,11 @@ const Dashboard = () => {
                   lastEntryDate={statistics?.last_entry_date || null}
                 />
               )}
+              {/* 2026-06-18: screening-due pill. Self-fetches from
+                  /api/assessments/due (count 0 -> renders null). Sage
+                  tone differs from D1's amber so a user can tell the
+                  two prompts apart at a glance. */}
+              <ScreeningDuePill />
             </div>
             <StreakDisplay compact currentStreak={streakData.currentStreak} />
           </div>

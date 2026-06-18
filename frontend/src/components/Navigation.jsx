@@ -43,6 +43,7 @@ const Navigation = () => {
     { to: '/journal',         label: 'Journal',  icon: '📝', tier: 'core' },
     { to: '/insights',        label: 'Insights', icon: '🌟', tier: 'core' },
     { to: '/recommendations', label: 'Self-Care', icon: '💜', tier: 'beta' },
+    { to: '/assessments',     label: 'Screening', icon: '📋', tier: 'beta' },
     { to: '/wearables',       label: 'Wearables', icon: '⌚', tier: 'experimental', badge: 'Mock data' },
     { to: '/peer-support',    label: 'Community', icon: '🤝', tier: 'beta' },
     { to: '/settings',        label: 'Settings', icon: '⚙️', tier: 'core' }

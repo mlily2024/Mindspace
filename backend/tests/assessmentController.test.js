@@ -152,9 +152,9 @@ describe('submitResponse', () => {
   });
 
   test('PHQ-9 Q9=2 propagates has_crisis_flag=true through the response', async () => {
-    // Today's user-asked contract: the controller MUST forward the flag.
-    // The next commit hooks safety_alerts on top of this — this test
-    // guards against accidentally dropping the bit from the payload.
+    // The controller MUST forward the flag. The follow-up Q9 -> safety hook
+    // builds on this — this test guards against accidentally dropping the
+    // bit from the payload.
     ValidatedAssessment.getLatestPerInstrument.mockResolvedValue([]);
     ValidatedAssessment.create.mockResolvedValue({
       assessment_id:   'a2',
@@ -173,6 +173,109 @@ describe('submitResponse', () => {
 
     const body = res.json.mock.calls[0][0];
     expect(body.data.has_crisis_flag).toBe(true);
+  });
+
+  // ─── Q9 crisis-flag → safety_alert + crisis_resources (2026-06-18) ───
+
+  test('PHQ-9 Q9 crisis flag → INSERT into safety_alerts AND crisis_resources payload', async () => {
+    const db = require('../src/config/database');
+    db.query.mockResolvedValue({ rowCount: 1 });
+
+    ValidatedAssessment.getLatestPerInstrument.mockResolvedValue([]);
+    ValidatedAssessment.create.mockResolvedValue({
+      assessment_id:   'a-crisis',
+      instrument:      'PHQ9',
+      total_score:     10,
+      severity_tier:   'moderate',
+      has_crisis_flag: true,
+      completed_at:    new Date().toISOString(),
+    });
+
+    const { req, res, next } = makeReqRes({
+      params: { instrument: 'PHQ9' },
+      body: { answers: [1, 1, 1, 1, 1, 1, 1, 1, 2] },
+    });
+    await assessmentController.submitResponse(req, res, next);
+
+    // safety_alerts insert
+    expect(db.query).toHaveBeenCalled();
+    const insertCall = db.query.mock.calls.find(c => /INSERT INTO safety_alerts/.test(c[0]));
+    expect(insertCall).toBeDefined();
+    expect(insertCall[1][2]).toBe('crisis_indicator');
+    expect(insertCall[1][3]).toBe('critical');
+    const alertData = JSON.parse(insertCall[1][4]);
+    expect(alertData).toEqual(expect.objectContaining({
+      source: 'validated_assessment',
+      instrument: 'PHQ9',
+      assessment_id: 'a-crisis',
+    }));
+
+    // Response payload carries UK crisis resources + a non-empty message
+    const body = res.json.mock.calls[0][0];
+    expect(body.data.crisis_resources).toEqual(expect.arrayContaining([
+      expect.objectContaining({ name: 'Samaritans',                contact: '116 123' }),
+      expect.objectContaining({ name: 'NHS Mental Health Crisis Line', contact: '111' }),
+      expect.objectContaining({ name: 'Emergency services',        contact: '999' }),
+    ]));
+    expect(body.data.crisis_message).toMatch(/UK services/);
+  });
+
+  test('no crisis flag → NO safety_alerts insert, crisis_resources is null', async () => {
+    const db = require('../src/config/database');
+    db.query.mockResolvedValue({ rowCount: 1 });
+
+    ValidatedAssessment.getLatestPerInstrument.mockResolvedValue([]);
+    ValidatedAssessment.create.mockResolvedValue({
+      assessment_id:   'a-clean',
+      instrument:      'PHQ9',
+      total_score:     3,
+      severity_tier:   'minimal',
+      has_crisis_flag: false,
+      completed_at:    new Date().toISOString(),
+    });
+
+    const { req, res, next } = makeReqRes({
+      params: { instrument: 'PHQ9' },
+      body: { answers: [1, 1, 1, 0, 0, 0, 0, 0, 0] },
+    });
+    await assessmentController.submitResponse(req, res, next);
+
+    const insertCall = db.query.mock.calls.find(c => /INSERT INTO safety_alerts/.test(c[0]));
+    expect(insertCall).toBeUndefined();
+
+    const body = res.json.mock.calls[0][0];
+    expect(body.data.crisis_resources).toBeNull();
+    expect(body.data.crisis_message).toBeNull();
+  });
+
+  test('safety_alerts INSERT failure does NOT fail the assessment response', async () => {
+    // Audit-log failures must not look like the submission failed.
+    // The user already answered; we must still return 201 + crisis_resources.
+    const db = require('../src/config/database');
+    db.query.mockRejectedValue(new Error('safety_alerts table missing'));
+
+    ValidatedAssessment.getLatestPerInstrument.mockResolvedValue([]);
+    ValidatedAssessment.create.mockResolvedValue({
+      assessment_id:   'a-resilient',
+      instrument:      'PHQ9',
+      total_score:     2,
+      severity_tier:   'minimal',
+      has_crisis_flag: true,
+      completed_at:    new Date().toISOString(),
+    });
+
+    const { req, res, next } = makeReqRes({
+      params: { instrument: 'PHQ9' },
+      body: { answers: [0, 0, 0, 0, 0, 0, 0, 0, 2] },
+    });
+    await assessmentController.submitResponse(req, res, next);
+
+    expect(res.status).toHaveBeenCalledWith(201);
+    expect(next).not.toHaveBeenCalled();
+    const body = res.json.mock.calls[0][0];
+    expect(body.success).toBe(true);
+    expect(body.data.has_crisis_flag).toBe(true);
+    expect(body.data.crisis_resources).not.toBeNull();
   });
 
   test('first-ever submission: change is null (no prior to compare)', async () => {

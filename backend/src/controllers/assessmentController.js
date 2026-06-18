@@ -1,10 +1,13 @@
 const logger = require('../config/logger');
+const { v4: uuidv4 } = require('uuid');
+const db = require('../config/database');
 const ValidatedAssessment = require('../models/ValidatedAssessment');
 const {
   INSTRUMENTS,
   getInstrument,
   listInstrumentSummaries,
 } = require('../data/screeningInstruments');
+const { UK_CRISIS_RESOURCES } = require('../services/safetyFilter');
 
 /**
  * Assessment controller — wires the /api/assessments routes onto
@@ -60,6 +63,71 @@ const SEVERITY_INTERPRETATIONS = Object.freeze({
 
 const interpretationFor = (instrument, tier) =>
   SEVERITY_INTERPRETATIONS[instrument]?.[tier] || null;
+
+/**
+ * Insert a row in safety_alerts when an instrument fires its crisis flag.
+ * Currently only PHQ-9 has a crisisIndex (Q9, "thoughts you would be better
+ * off dead or of hurting yourself") — any value >= 1 fires.
+ *
+ * Mirrors insightsEngine.createSafetyAlert (services/insightsEngine.js:263)
+ * so a single safety_alerts dashboard surfaces crises from both the mood
+ * pipeline and the screening pipeline.
+ *
+ * Failures here MUST NOT block the assessment response — the user already
+ * answered the questionnaire; a logging failure should not look like the
+ * submission failed. We log and swallow.
+ */
+const recordCrisisAlert = async (userId, instrument, created) => {
+  try {
+    const inst = getInstrument(instrument);
+    const alertData = {
+      source:          'validated_assessment',
+      instrument,
+      assessment_id:   created.assessment_id,
+      total_score:     created.total_score,
+      severity_tier:   created.severity_tier,
+      crisis_index:    inst?.crisisIndex,
+      message:         'Suicidal-ideation item endorsed during a validated screening assessment.',
+    };
+    await db.query(
+      `INSERT INTO safety_alerts (alert_id, user_id, alert_type, severity, alert_data)
+       VALUES ($1, $2, $3, $4, $5)`,
+      [uuidv4(), userId, 'crisis_indicator', 'critical', JSON.stringify(alertData)]
+    );
+    logger.warn('Crisis safety alert created from assessment', {
+      userId,
+      instrument,
+      assessment_id: created.assessment_id,
+    });
+  } catch (e) {
+    logger.error('Failed to persist crisis safety alert (assessment response still returned)', {
+      userId,
+      instrument,
+      error: e.message,
+    });
+  }
+};
+
+/**
+ * Build the crisis-resources payload returned alongside a flagged
+ * assessment response. Uses the SAME UK_CRISIS_RESOURCES table that
+ * SafetyFilter exposes to Luna so the user sees consistent numbers
+ * (Samaritans 116 123, Shout 85258, NHS 111, Papyrus 0800 068 4141,
+ * 999) regardless of which surface raised the flag.
+ *
+ * Returned as a plain array of {name, contact, note} so the frontend
+ * can render it without knowing the resource keys.
+ */
+const buildCrisisResourcesPayload = () => {
+  const R = UK_CRISIS_RESOURCES;
+  return [
+    { name: R.samaritans.name, contact: R.samaritans.phone, note: R.samaritans.note },
+    { name: R.shout.name,      contact: R.shout.sms,        note: '24/7, free' },
+    { name: R.nhs.name,        contact: R.nhs.phone,        note: R.nhs.note },
+    { name: R.papyrus.name,    contact: R.papyrus.phone,    note: R.papyrus.note },
+    { name: R.emergency.name,  contact: R.emergency.phone,  note: R.emergency.note },
+  ];
+};
 
 // Days since a date string / Date — null if no input
 const daysSince = (when) => {
@@ -189,6 +257,14 @@ const submitResponse = async (req, res, next) => {
       crisis: created.has_crisis_flag,
     });
 
+    // Crisis path. recordCrisisAlert swallows its own errors so a
+    // failed audit-row insert never causes the user's submission to
+    // appear failed. We DO still surface the crisis_resources in the
+    // response so the UI shows them even if the alert insert failed.
+    if (created.has_crisis_flag) {
+      await recordCrisisAlert(userId, instrument, created);
+    }
+
     res.status(201).json({
       success: true,
       data: {
@@ -201,6 +277,10 @@ const submitResponse = async (req, res, next) => {
         interpretation:   interpretationFor(instrument, created.severity_tier),
         change:           priorScore !== null ? created.total_score - priorScore : null,
         completed_at:     created.completed_at,
+        crisis_resources: created.has_crisis_flag ? buildCrisisResourcesPayload() : null,
+        crisis_message:   created.has_crisis_flag
+          ? "Thank you for sharing that with us. You marked an item about thoughts of being better off dead or hurting yourself. Please consider reaching out to one of the UK services below — they have people trained to help."
+          : null,
       },
     });
   } catch (error) {

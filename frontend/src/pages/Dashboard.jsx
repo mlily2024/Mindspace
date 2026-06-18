@@ -194,6 +194,15 @@ const Dashboard = () => {
               <p style={{ opacity: 0.9, fontSize: 'var(--font-size-large)' }}>
                 How are you feeling today?
               </p>
+              {/* D1 (2026-06-18): last-check-in pill. Honest about absences
+                  without shaming. Day-precision is fine since entry_date
+                  is a DATE column. */}
+              {!loading && (
+                <LastCheckInPill
+                  totalEntries={statistics?.total_entries || 0}
+                  lastEntryDate={statistics?.last_entry_date || null}
+                />
+              )}
             </div>
             <StreakDisplay compact currentStreak={streakData.currentStreak} />
           </div>

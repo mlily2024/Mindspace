@@ -338,6 +338,26 @@ const LunaChat = () => {
     maxWidth: '85%'
   };
 
+  // 2026-06-18: shared shape for the Minimise + Close icon buttons in
+  // the header. Bigger hit area + radius so they read as buttons; hover
+  // background applied inline on mouse enter/leave to avoid pulling
+  // CSS-in-JS dependency for a two-element interaction.
+  const iconButtonStyle = {
+    background: 'rgba(255,255,255,0.0)',
+    border: 'none',
+    color: 'white',
+    cursor: 'pointer',
+    fontSize: '18px',
+    lineHeight: 1,
+    width: 28,
+    height: 28,
+    borderRadius: 6,
+    display: 'inline-flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    transition: 'background 120ms ease'
+  };
+
   const sidebarStyle = {
     width: showSidebar && !isMobile ? '200px' : '0px',
     overflow: 'hidden',
@@ -495,12 +515,33 @@ const LunaChat = () => {
                 >
                   New Session
                 </button>
+                {/* 2026-06-18: split the previous lone ASCII "x" into TWO
+                    affordances — Minimise + Close. They call the same
+                    handler because the component is mounted at app level,
+                    so setIsOpen(false) preserves the conversation in
+                    React state either way. The split exists so the user
+                    has a recognisable "tuck this away, keep my chat"
+                    target. Icons rendered larger with hover background
+                    so they read as real buttons, not stray characters. */}
                 <button
                   onClick={() => setIsOpen(false)}
-                  style={{ background: 'none', border: 'none', color: 'white', cursor: 'pointer', fontSize: '18px', lineHeight: 1, padding: '0 4px' }}
-                  aria-label="Close chat"
+                  style={iconButtonStyle}
+                  onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(255,255,255,0.25)'; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.background = 'rgba(255,255,255,0.0)'; }}
+                  aria-label="Minimise chat"
+                  title="Minimise (keeps your conversation)"
                 >
-                  x
+                  &#x2013;
+                </button>
+                <button
+                  onClick={() => setIsOpen(false)}
+                  style={iconButtonStyle}
+                  onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(255,255,255,0.25)'; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.background = 'rgba(255,255,255,0.0)'; }}
+                  aria-label="Close chat"
+                  title="Close"
+                >
+                  &#x2715;
                 </button>
               </div>
             </div>

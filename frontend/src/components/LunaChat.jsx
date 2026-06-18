@@ -45,22 +45,43 @@ const LunaChat = () => {
   const loadContext = async () => {
     try {
       const res = await api.get('/luna/context');
-      setSessionContext(res.data || null);
+      const ctx = res.data || null;
+      setSessionContext(ctx);
+      return ctx;
     } catch (err) {
       console.error('Failed to load Luna context:', err);
+      return null;
     }
   };
 
+  // 2026-06-18: gentle greeting when the user has an unacknowledged
+  // crisis_indicator from the last 24h (e.g. just submitted PHQ-9 with
+  // Q9 flagged via assessmentController). Trauma-informed:
+  //   - acknowledges without naming the specific item
+  //   - offers without pressuring ("there's no pressure to talk about it")
+  //   - opens with an easy door ("anything else on your mind")
+  // The default greeting stays the same so day-to-day sessions are not
+  // affected.
+  const greetingFor = (ctx) => {
+    if (ctx?.recentCrisisAlert) {
+      return "Hi, I'm Luna. I noticed something heavy came up on a recent screening. I'm here for that, or for whatever else is on your mind. There's no pressure to talk about it. How are you doing right now?";
+    }
+    return "Hi, I'm Luna. How are you feeling right now?";
+  };
+
   const startNewSession = async () => {
+    setSessionId(null);
+    setSessionContext(null);
+    // Load context FIRST so the greeting can branch on recentCrisisAlert.
+    // If context loading fails the function returns null and we fall
+    // through to the default greeting — Luna still opens.
+    const ctx = await loadContext();
     setMessages([{
       sender: 'luna',
       type: 'text',
-      content: "Hi, I'm Luna. How are you feeling right now?",
+      content: greetingFor(ctx),
       timestamp: new Date().toISOString()
     }]);
-    setSessionId(null);
-    setSessionContext(null);
-    loadContext();
   };
 
   const handleSend = async () => {

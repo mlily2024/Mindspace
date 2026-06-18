@@ -202,15 +202,56 @@ class LunaService {
       `;
       const moodResult = await db.query(moodQuery, [userId]);
 
+      // 2026-06-18: most recent unacknowledged crisis_indicator alert in
+      // the last 24 hours. Drives Luna's session-open greeting so a user
+      // who just submitted PHQ-9 with Q9 flagged (or any future crisis
+      // trigger written via insightsEngine / assessmentController) is
+      // greeted with a knowing, gentler opener rather than the default
+      // "How are you feeling right now?". Failure here MUST NOT crash
+      // context — if the safety_alerts query throws, we just hand back
+      // null for this field and let the rest of the context populate.
+      let recentCrisisAlert = null;
+      try {
+        const alertResult = await db.query(
+          `SELECT alert_id, alert_type, severity, alert_data, triggered_at
+           FROM safety_alerts
+           WHERE user_id = $1
+             AND alert_type = 'crisis_indicator'
+             AND is_acknowledged = false
+             AND triggered_at >= CURRENT_TIMESTAMP - INTERVAL '24 hours'
+           ORDER BY triggered_at DESC
+           LIMIT 1`,
+          [userId]
+        );
+        const row = alertResult.rows[0];
+        if (row) {
+          recentCrisisAlert = {
+            alert_id:     row.alert_id,
+            triggered_at: row.triggered_at,
+            severity:     row.severity,
+            source:       row.alert_data?.source       || null,
+            instrument:   row.alert_data?.instrument   || null,
+          };
+        }
+      } catch (alertErr) {
+        logger.warn('Could not load recentCrisisAlert for Luna context', {
+          userId, error: alertErr.message,
+        });
+      }
+
       return {
         lastSessionSummary: lastSummary ? lastSummary.content : null,
         lastSessionDate: lastSummary ? lastSummary.created_at : null,
         keyThemes: themes,
-        recentMood: moodResult.rows
+        recentMood: moodResult.rows,
+        recentCrisisAlert,
       };
     } catch (error) {
       logger.error('Error building session context', { error: error.message, userId });
-      return { lastSessionSummary: null, lastSessionDate: null, keyThemes: [], recentMood: [] };
+      return {
+        lastSessionSummary: null, lastSessionDate: null,
+        keyThemes: [], recentMood: [], recentCrisisAlert: null,
+      };
     }
   }
 

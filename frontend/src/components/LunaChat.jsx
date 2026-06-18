@@ -215,6 +215,15 @@ const LunaChat = () => {
     transition: 'transform 0.2s ease'
   };
 
+  // 2026-06-18: maxHeight cap so the window can NEVER exceed the
+  // viewport. Previously height: 560px + bottom: 96px needed 656px
+  // of vertical room — on short laptop screens, split-screen, or
+  // browser zoom, the top of the window (with the header + close +
+  // minimise buttons) was clipped above the viewport. Because the
+  // window is position: fixed, page scroll cannot reach it.
+  //
+  // calc(100vh - 120px) leaves 96px below (FAB clearance) + ~24px
+  // above (breathing room) so the header is always visible.
   const chatWindowStyle = {
     position: 'fixed',
     bottom: '96px',
@@ -222,6 +231,7 @@ const LunaChat = () => {
     width: isMobile ? 'calc(100vw - 32px)' : '420px',
     maxWidth: '95vw',
     height: isMobile ? '70vh' : '560px',
+    maxHeight: 'calc(100vh - 120px)',
     background: 'white',
     borderRadius: 'var(--radius-xl)',
     boxShadow: '0 8px 40px rgba(155, 138, 165, 0.3)',

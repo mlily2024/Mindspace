@@ -634,7 +634,7 @@ const Insights = () => {
                     }}
                   >
                     <div style={{ fontSize: 'var(--font-size-small)', color: 'var(--text-secondary)', marginBottom: 'var(--spacing-xs)' }}>
-                      {new Date(insight.generated_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}
+                      {new Date(insight.generated_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
                       {' • '}
                       {insight.insight_type === 'improvement' ? '📈' : insight.insight_type === 'trend' ? '📊' : '⚠️'}
                       {' '}

@@ -246,7 +246,8 @@ const Journal = () => {
             {new Date().toLocaleDateString('en-GB', {
               weekday: 'long',
               day: 'numeric',
-              month: 'long'
+              month: 'long',
+              year: 'numeric'
             })}
           </p>
           <h1 style={{

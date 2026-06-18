@@ -105,7 +105,7 @@ const Predictions = () => {
     tomorrow.setDate(tomorrow.getDate() + 1);
     if (d.toDateString() === today.toDateString()) return 'Today';
     if (d.toDateString() === tomorrow.toDateString()) return 'Tomorrow';
-    return d.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
+    return d.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
   };
 
   // ---- Styles ----

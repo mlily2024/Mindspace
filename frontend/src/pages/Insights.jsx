@@ -545,13 +545,28 @@ const Insights = () => {
         {/* Mood Trend Chart (Simple) */}
         {trends && trends.scores && trends.scores.length > 5 && (
           <div style={cardStyle} className="animate-fade-in-up">
-            <h3 style={{ marginBottom: 'var(--spacing-lg)', display: 'flex', alignItems: 'center', gap: 'var(--spacing-sm)' }}>
+            <h3 style={{ marginBottom: 'var(--spacing-xs)', display: 'flex', alignItems: 'center', gap: 'var(--spacing-sm)' }}>
               <span>📈</span> Mood Over Time
             </h3>
+            {/* 2026-06-18: chart caption + visible score-per-bar + full
+                date labels. Previously the bottom labels were `.split(' ')[1]`
+                of "Jun 11" — i.e. bare day-of-month numbers like "11",
+                "12", and the score was only visible on hover. A reviewer
+                seeing "11" had no way to tell if it was a date, score,
+                or index. Caption tells them; date labels render in full;
+                score sits above each bar. */}
+            <p style={{
+              marginTop: 0,
+              marginBottom: 'var(--spacing-md)',
+              color: 'var(--text-secondary)',
+              fontSize: '0.85rem',
+            }}>
+              Daily mood score (1–10) — last 14 entries
+            </p>
             <div style={{
               display: 'flex',
               alignItems: 'end',
-              height: '150px',
+              height: '170px',
               gap: '4px',
               padding: 'var(--spacing-md) 0'
             }}>
@@ -563,9 +578,17 @@ const Insights = () => {
                     display: 'flex',
                     flexDirection: 'column',
                     alignItems: 'center',
-                    gap: 'var(--spacing-xs)'
+                    gap: 'var(--spacing-xs)',
+                    justifyContent: 'flex-end',
                   }}
                 >
+                  <span style={{
+                    fontSize: '0.72rem',
+                    fontWeight: 600,
+                    color: 'var(--text-primary)',
+                  }}>
+                    {score}
+                  </span>
                   <div
                     style={{
                       width: '100%',
@@ -580,15 +603,16 @@ const Insights = () => {
                     title={`${trends.dates.slice(-14)[i]}: ${score}/10`}
                   />
                   <span style={{
-                    fontSize: '0.6rem',
+                    fontSize: '0.65rem',
                     color: 'var(--text-secondary)',
                     writingMode: 'vertical-lr',
                     textOrientation: 'mixed',
                     transform: 'rotate(180deg)',
-                    height: '30px',
-                    overflow: 'hidden'
+                    height: '46px',
+                    overflow: 'hidden',
+                    whiteSpace: 'nowrap',
                   }}>
-                    {trends.dates.slice(-14)[i]?.split(' ')[1] || ''}
+                    {trends.dates.slice(-14)[i] || ''}
                   </span>
                 </div>
               ))}

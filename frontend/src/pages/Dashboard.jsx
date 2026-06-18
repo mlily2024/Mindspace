@@ -3,6 +3,8 @@ import { Link } from 'react-router-dom';
 import Navigation from '../components/Navigation';
 import StreakDisplay, { AchievementsGrid } from '../components/StreakDisplay';
 import MoodForecast from '../components/MoodForecast';
+import LoadErrorBanner from '../components/LoadErrorBanner';
+import LastCheckInPill from '../components/LastCheckInPill';
 // Phase 1.3 step 9 (ADR-0009): lazy-load the E2EE modals so their crypto
 // dependencies (~50 KB worth of argon2-browser + bip39 wordlist + util
 // code) only enter the bundle for users who actually need a modal.

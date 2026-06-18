@@ -330,6 +330,20 @@ const Assessments = () => {
       <div style={pageStyle}>
         <Navigation />
         <div style={containerStyle}>
+          {/* Crisis banner — rendered ABOVE the score so it is the first
+              thing the user sees when has_crisis_flag is true. Source of
+              the resources + message is the backend (commit eab1987),
+              which uses the same UK_CRISIS_RESOURCES table SafetyFilter
+              shares with Luna, so the numbers match across surfaces.
+              Trauma-informed copy: warm tone, not alarming; we never
+              tell the user what they "should" do, only offer options. */}
+          {result.has_crisis_flag && result.crisis_resources?.length > 0 && (
+            <CrisisBanner
+              message={result.crisis_message}
+              resources={result.crisis_resources}
+            />
+          )}
+
           <div style={{ ...cardStyle, textAlign: 'center', padding: 'var(--spacing-xl, 32px)' }}>
             <h2 style={{ ...headerStyle, marginBottom: '8px' }}>Results: {activeInstrument}</h2>
 
@@ -523,6 +537,119 @@ const Assessments = () => {
             <HistoryChart history={history} loading={historyLoading} instrument={historyInstrument} />
           </div>
         )}
+      </div>
+    </div>
+  );
+};
+
+/**
+ * CrisisBanner — rendered on the results screen when a validated
+ * instrument fires its crisis flag (currently only PHQ-9 Q9 at value
+ * >= 1; "thoughts you would be better off dead, or of hurting yourself").
+ *
+ * Visual goals:
+ *   - Soft amber, NOT alarming red. Trauma-informed: a user who just
+ *     endorsed Q9 does not need shock colour on top of the moment.
+ *   - Clearly distinct from the score card so it cannot be missed by
+ *     glancing over the page.
+ *   - Each resource is tappable on mobile (tel: for phone-shaped
+ *     contacts; plain text for SMS instructions like "text SHOUT to
+ *     85258" since sms: deep-links are unreliable across platforms).
+ *
+ * Copy is locked to what the backend sends (`crisis_message`) so the
+ * UI stays consistent with whatever SafetyFilter / future locale work
+ * decides — no second source of truth.
+ */
+const CrisisBanner = ({ message, resources }) => {
+  const looksLikePhone = (s) => /^\s*[\d\s+()-]+\s*$/.test(String(s));
+  const telHref = (s) => `tel:${String(s).replace(/[^\d+]/g, '')}`;
+
+  return (
+    <div
+      role="region"
+      aria-label="Crisis support resources"
+      style={{
+        background: 'linear-gradient(180deg, #FFF8EC 0%, #FFEFD4 100%)',
+        border: '1px solid #E0B173',
+        borderLeft: '5px solid #C9821F',
+        borderRadius: 'var(--radius-lg, 16px)',
+        padding: 'var(--spacing-lg, 20px)',
+        marginBottom: 'var(--spacing-md, 16px)',
+        boxShadow: '0 2px 12px rgba(201, 130, 31, 0.10)',
+      }}
+    >
+      <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
+        <span aria-hidden="true" style={{ fontSize: '1.4rem', lineHeight: 1.2, marginTop: 2 }}>💛</span>
+        <div style={{ flex: 1 }}>
+          <div style={{
+            fontSize: '1.05rem',
+            fontWeight: 600,
+            color: '#7B4A0E',
+            marginBottom: '6px',
+          }}>
+            You are not alone in this.
+          </div>
+          {message && (
+            <p style={{
+              fontSize: '0.95rem',
+              color: '#5A3A0E',
+              lineHeight: 1.55,
+              margin: '0 0 12px',
+            }}>
+              {message}
+            </p>
+          )}
+          <ul style={{
+            listStyle: 'none',
+            padding: 0,
+            margin: 0,
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '8px',
+          }}>
+            {resources.map((r, i) => (
+              <li
+                key={i}
+                style={{
+                  display: 'flex',
+                  flexWrap: 'wrap',
+                  alignItems: 'baseline',
+                  gap: '6px',
+                  fontSize: '0.92rem',
+                  color: '#4A3F55',
+                }}
+              >
+                <strong style={{ color: '#4A3F55' }}>{r.name}</strong>
+                <span aria-hidden="true">—</span>
+                {looksLikePhone(r.contact) ? (
+                  <a
+                    href={telHref(r.contact)}
+                    style={{
+                      color: '#7B4A0E',
+                      fontWeight: 600,
+                      textDecoration: 'underline',
+                    }}
+                  >
+                    {r.contact}
+                  </a>
+                ) : (
+                  <span style={{ color: '#7B4A0E', fontWeight: 600 }}>{r.contact}</span>
+                )}
+                {r.note && (
+                  <span style={{ color: '#6b5f7a', fontSize: '0.85rem' }}>({r.note})</span>
+                )}
+              </li>
+            ))}
+          </ul>
+          <p style={{
+            marginTop: '12px',
+            fontSize: '0.85rem',
+            color: '#6b5f7a',
+            fontStyle: 'italic',
+          }}>
+            Your score has been saved. You can choose to stay on this page or step away.
+          </p>
+        </div>
       </div>
     </div>
   );

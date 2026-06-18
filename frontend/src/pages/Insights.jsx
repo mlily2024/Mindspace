@@ -288,7 +288,17 @@ const Insights = () => {
         {safetyAlerts.length > 0 && (
           <div style={{ marginBottom: 'var(--spacing-xl)' }}>
             {safetyAlerts.map((alert) => {
-              const data = JSON.parse(alert.alert_data);
+              // 2026-06-18: alert_data is a Postgres JSONB column. The pg
+              // driver auto-parses JSONB to a JS object before the row
+              // reaches the controller, so calling JSON.parse on it
+              // coerces the object to "[object Object]" and throws on the
+              // 'o' at column 2. Was latent until today's PHQ-9 Q9 path
+              // wrote the first safety_alerts row. Defensive shape handles
+              // both: already-parsed object (normal) OR string (if
+              // anything ever re-serialises in transit).
+              const data = typeof alert.alert_data === 'string'
+                ? JSON.parse(alert.alert_data)
+                : (alert.alert_data || {});
               return (
                 <div
                   key={alert.alert_id}
@@ -620,7 +630,11 @@ const Insights = () => {
             </div>
             <div style={{ display: 'grid', gap: 'var(--spacing-md)' }}>
               {insights.slice(0, 5).map((insight) => {
-                const data = JSON.parse(insight.insight_data);
+                // Same JSONB auto-parse story as the safety_alerts loop
+                // above. user_insights.insight_data is also JSONB.
+                const data = typeof insight.insight_data === 'string'
+                  ? JSON.parse(insight.insight_data)
+                  : (insight.insight_data || {});
                 const borderColor = insight.insight_type === 'improvement' ? '#A8C5A8' :
                                    insight.insight_type === 'trend' ? '#9B8AA5' : '#F5D89A';
                 return (

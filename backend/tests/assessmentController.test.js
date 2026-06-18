@@ -218,6 +218,11 @@ describe('submitResponse', () => {
       expect.objectContaining({ name: 'Emergency services',        contact: '999' }),
     ]));
     expect(body.data.crisis_message).toMatch(/UK services/);
+
+    // 2026-06-18: alert_id MUST be returned so the frontend acknowledge
+    // button can call PUT /api/insights/safety-alerts/:alertId/acknowledge.
+    // Comes from recordCrisisAlert returning the uuid it just inserted.
+    expect(body.data.crisis_alert_id).toBe(insertCall[1][0]);
   });
 
   test('no crisis flag → NO safety_alerts insert, crisis_resources is null', async () => {

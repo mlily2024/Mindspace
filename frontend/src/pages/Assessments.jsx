@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import Navigation from '../components/Navigation';
-import api from '../services/api';
+import api, { insightsAPI } from '../services/api';
 
 /**
  * Assessments - Clinical assessments page (PHQ9, GAD7, PSS4, ISI, WEMWBS)
@@ -341,6 +341,7 @@ const Assessments = () => {
             <CrisisBanner
               message={result.crisis_message}
               resources={result.crisis_resources}
+              alertId={result.crisis_alert_id}
             />
           )}
 
@@ -560,9 +561,33 @@ const Assessments = () => {
  * UI stays consistent with whatever SafetyFilter / future locale work
  * decides — no second source of truth.
  */
-const CrisisBanner = ({ message, resources }) => {
+const CrisisBanner = ({ message, resources, alertId }) => {
   const looksLikePhone = (s) => /^\s*[\d\s+()-]+\s*$/.test(String(s));
   const telHref = (s) => `tel:${String(s).replace(/[^\d+]/g, '')}`;
+
+  // 2026-06-18: acknowledge loop. Marks the safety_alerts row as
+  // acknowledged so Luna's gentle session-open greeting (24h window)
+  // returns to default for new sessions. Resources stay visible — the
+  // user may still want them — but the call-to-action goes quiet.
+  // If the alertId is missing (recordCrisisAlert failed on the server)
+  // we hide the button entirely; the banner still shows resources.
+  const [acked, setAcked] = React.useState(false);
+  const [acking, setAcking] = React.useState(false);
+  const [ackError, setAckError] = React.useState(null);
+
+  const onAcknowledge = async () => {
+    if (!alertId || acking) return;
+    setAcking(true);
+    setAckError(null);
+    try {
+      await insightsAPI.acknowledgeSafetyAlert(alertId, { actionTaken: 'reviewed_resources' });
+      setAcked(true);
+    } catch (e) {
+      setAckError('Could not mark as acknowledged. The resources are still here whenever you need them.');
+    } finally {
+      setAcking(false);
+    }
+  };
 
   return (
     <div
@@ -641,14 +666,52 @@ const CrisisBanner = ({ message, resources }) => {
               </li>
             ))}
           </ul>
-          <p style={{
-            marginTop: '12px',
-            fontSize: '0.85rem',
-            color: '#6b5f7a',
-            fontStyle: 'italic',
-          }}>
-            Your score has been saved. You can choose to stay on this page or step away.
-          </p>
+          {!acked ? (
+            <>
+              <p style={{
+                marginTop: '12px',
+                fontSize: '0.85rem',
+                color: '#6b5f7a',
+                fontStyle: 'italic',
+              }}>
+                Your score has been saved. You can choose to stay on this page or step away.
+              </p>
+              {alertId && (
+                <div style={{ marginTop: '10px', display: 'flex', flexWrap: 'wrap', gap: '8px', alignItems: 'center' }}>
+                  <button
+                    type="button"
+                    onClick={onAcknowledge}
+                    disabled={acking}
+                    style={{
+                      padding: '6px 14px',
+                      border: '1px solid #C9821F',
+                      background: 'white',
+                      color: '#7B4A0E',
+                      borderRadius: 'var(--radius-md, 8px)',
+                      fontWeight: 600,
+                      fontSize: '0.88rem',
+                      cursor: acking ? 'not-allowed' : 'pointer',
+                      opacity: acking ? 0.6 : 1,
+                    }}
+                  >
+                    {acking ? 'Saving…' : "I've noted these — thank you"}
+                  </button>
+                  {ackError && (
+                    <span style={{ fontSize: '0.82rem', color: '#7B4A0E' }}>{ackError}</span>
+                  )}
+                </div>
+              )}
+            </>
+          ) : (
+            <p style={{
+              marginTop: '12px',
+              fontSize: '0.88rem',
+              color: '#4B7B3E',
+              fontWeight: 500,
+            }}>
+              ✓ Acknowledged. These numbers stay here whenever you want them.
+            </p>
+          )}
         </div>
       </div>
     </div>

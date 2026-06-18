@@ -89,22 +89,30 @@ const recordCrisisAlert = async (userId, instrument, created) => {
       crisis_index:    inst?.crisisIndex,
       message:         'Suicidal-ideation item endorsed during a validated screening assessment.',
     };
+    const alertId = uuidv4();
     await db.query(
       `INSERT INTO safety_alerts (alert_id, user_id, alert_type, severity, alert_data)
        VALUES ($1, $2, $3, $4, $5)`,
-      [uuidv4(), userId, 'crisis_indicator', 'critical', JSON.stringify(alertData)]
+      [alertId, userId, 'crisis_indicator', 'critical', JSON.stringify(alertData)]
     );
     logger.warn('Crisis safety alert created from assessment', {
       userId,
       instrument,
       assessment_id: created.assessment_id,
+      alert_id: alertId,
     });
+    // 2026-06-18: return the alert_id so submitResponse can include it
+    // in the response payload. The frontend CrisisBanner uses it to call
+    // PUT /api/insights/safety-alerts/:alertId/acknowledge, which clears
+    // the gentle-greeting branch in Luna's session-open path within 24h.
+    return alertId;
   } catch (e) {
     logger.error('Failed to persist crisis safety alert (assessment response still returned)', {
       userId,
       instrument,
       error: e.message,
     });
+    return null;
   }
 };
 
@@ -261,8 +269,11 @@ const submitResponse = async (req, res, next) => {
     // failed audit-row insert never causes the user's submission to
     // appear failed. We DO still surface the crisis_resources in the
     // response so the UI shows them even if the alert insert failed.
+    // alertId is null when the insert failed; the banner just won't
+    // be acknowledgeable in that case (resources still render).
+    let crisisAlertId = null;
     if (created.has_crisis_flag) {
-      await recordCrisisAlert(userId, instrument, created);
+      crisisAlertId = await recordCrisisAlert(userId, instrument, created);
     }
 
     res.status(201).json({
@@ -278,6 +289,7 @@ const submitResponse = async (req, res, next) => {
         change:           priorScore !== null ? created.total_score - priorScore : null,
         completed_at:     created.completed_at,
         crisis_resources: created.has_crisis_flag ? buildCrisisResourcesPayload() : null,
+        crisis_alert_id:  crisisAlertId,
         crisis_message:   created.has_crisis_flag
           ? "Thank you for sharing that with us. You marked an item about thoughts of being better off dead or hurting yourself. Please consider reaching out to one of the UK services below — they have people trained to help."
           : null,

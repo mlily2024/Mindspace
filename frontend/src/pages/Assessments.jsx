@@ -754,6 +754,10 @@ const HistoryChart = ({ history, loading, instrument }) => {
 
   const maxScore = Math.max(...history.map(h => h.score || h.total_score || 0), 1);
   const chartHeight = 160;
+  // Most recent 12 assessments, displayed oldest-left -> newest-right.
+  // history is newest-first from the API, so take the head and reverse
+  // (was slice(-12), which showed the OLDEST 12 in reverse order).
+  const chartEntries = history.slice(0, 12).reverse();
 
   const getBarColor = (severity) => {
     const s = (severity || '').toLowerCase();
@@ -806,7 +810,7 @@ const HistoryChart = ({ history, loading, instrument }) => {
         borderBottom: '2px solid #f0ebf4',
         paddingBottom: '4px'
       }}>
-        {history.slice(-12).map((entry, i) => {
+        {chartEntries.map((entry, i) => {
           const score = entry.score || entry.total_score || 0;
           const height = Math.max(8, (score / maxScore) * (chartHeight - 24));
           return (
@@ -846,16 +850,19 @@ const HistoryChart = ({ history, loading, instrument }) => {
       </div>
       {/* Date labels */}
       <div style={{ display: 'flex', gap: '8px', marginTop: '6px' }}>
-        {history.slice(-12).map((entry, i) => (
-          <div key={i} style={{
-            flex: 1,
-            textAlign: 'center',
-            fontSize: '0.6rem',
-            color: '#9B8AA5'
-          }}>
-            {entry.date ? new Date(entry.date).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) : ''}
-          </div>
-        ))}
+        {chartEntries.map((entry, i) => {
+          const when = entry.completed_at || entry.date;
+          return (
+            <div key={i} style={{
+              flex: 1,
+              textAlign: 'center',
+              fontSize: '0.6rem',
+              color: '#9B8AA5'
+            }}>
+              {when ? new Date(when).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) : ''}
+            </div>
+          );
+        })}
       </div>
     </div>
   );

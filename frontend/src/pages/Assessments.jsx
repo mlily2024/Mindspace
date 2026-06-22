@@ -764,6 +764,16 @@ const HistoryChart = ({ history, loading, instrument }) => {
     return '#B8A9C9';
   };
 
+  // Reliable Change Index for the latest assessment vs the previous one (ADR-0011).
+  // history is newest-first, so history[0].reliable_change is the latest change.
+  const latestRC = history[0] && history[0].reliable_change;
+  const rcStyles = {
+    reliable_improvement:   { bg: '#E6F4EA', fg: '#1E7E34', icon: '✓', label: 'Reliable improvement since your last check' },
+    reliable_deterioration: { bg: '#FCE8E6', fg: '#C5221F', icon: '▲', label: 'Reliable deterioration since your last check' },
+    no_reliable_change:     { bg: '#F0EBF4', fg: '#6B5B73', icon: '≈', label: 'Change is within measurement noise' },
+  };
+  const rc = latestRC ? (rcStyles[latestRC.direction] || rcStyles.no_reliable_change) : null;
+
   return (
     <div style={{
       background: '#fff',
@@ -771,6 +781,23 @@ const HistoryChart = ({ history, loading, instrument }) => {
       padding: '24px',
       boxShadow: '0 2px 12px rgba(74, 63, 85, 0.06)'
     }}>
+      {rc && (
+        <div
+          style={{
+            display: 'flex', alignItems: 'center', gap: '8px',
+            background: rc.bg, color: rc.fg,
+            borderRadius: '10px', padding: '10px 14px', marginBottom: '16px',
+            fontSize: '0.9rem', fontWeight: 600
+          }}
+          title={`Reliable Change Index ${latestRC.rci} (a change counts as reliable when |RCI| ≥ ${latestRC.threshold}). Compares your two most recent ${instrument} scores against this instrument's measurement error.`}
+        >
+          <span aria-hidden="true">{rc.icon}</span>
+          <span>{rc.label}</span>
+          <span style={{ marginLeft: 'auto', fontWeight: 500, opacity: 0.75, fontSize: '0.8rem' }}>
+            RCI {latestRC.rci}
+          </span>
+        </div>
+      )}
       <div style={{
         display: 'flex',
         alignItems: 'flex-end',

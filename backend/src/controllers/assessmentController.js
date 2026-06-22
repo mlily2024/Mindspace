@@ -8,6 +8,7 @@ const {
   listInstrumentSummaries,
 } = require('../data/screeningInstruments');
 const { UK_CRISIS_RESOURCES } = require('../services/safetyFilter');
+const { computeRCI } = require('../utils/reliableChange');
 
 /**
  * Assessment controller — wires the /api/assessments routes onto
@@ -329,6 +330,16 @@ const getHistory = async (req, res, next) => {
       severity_tier: r.severity_tier,
       completed_at:  r.completed_at,
     }));
+
+    // Attach Reliable Change Index vs the next-older same-instrument assessment.
+    // rows are newest-first, so history[i+1] is the previous assessment in time.
+    // Pure computation from the scores we already hold — no schema change. (ADR-0011)
+    history.forEach((h, i) => {
+      const previous = history[i + 1];
+      h.reliable_change = previous
+        ? computeRCI(instrument, previous.total_score, h.total_score)
+        : null;
+    });
 
     res.json({ success: true, data: { instrument, history } });
   } catch (error) {

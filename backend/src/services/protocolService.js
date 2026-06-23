@@ -6,7 +6,7 @@
 
 const db = require('../config/database');
 const logger = require('../config/logger');
-const { v4: uuidv4 } = require('uuid');
+const { computeAdaptation } = require('./protocolAdaptation');
 
 class ProtocolService {
   /**
@@ -21,36 +21,38 @@ class ProtocolService {
       }
 
       const protocols = this._getProtocolDefinitions();
+      let seeded = 0;
 
       for (const proto of protocols) {
         const existsCheck = await db.query(
-          `SELECT id FROM therapeutic_protocols WHERE slug = $1`,
-          [proto.slug]
+          `SELECT protocol_id FROM therapeutic_protocols WHERE name = $1`,
+          [proto.name]
         );
 
         if (existsCheck.rows.length > 0) continue;
 
+        // The schema column is `modality`; the definitions call it `approach`.
         await db.query(
           `INSERT INTO therapeutic_protocols
-             (id, slug, name, approach, duration_weeks, total_sessions, target_condition,
-              description, sessions, is_active, created_at)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, true, NOW())`,
+             (name, description, modality, target_condition, duration_weeks,
+              total_sessions, difficulty_level, sessions, is_active)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, true)`,
           [
-            uuidv4(),
-            proto.slug,
             proto.name,
+            proto.description,
             proto.approach,
+            proto.target_condition,
             proto.duration_weeks,
             proto.total_sessions,
-            proto.target_condition,
-            proto.description,
+            proto.difficulty_level || 'beginner',
             JSON.stringify(proto.sessions)
           ]
         );
+        seeded += 1;
       }
 
-      logger.info('Therapeutic protocols seeded', { count: protocols.length });
-      return { status: 'seeded', count: protocols.length };
+      logger.info('Therapeutic protocols seeded', { count: seeded });
+      return { status: 'seeded', count: seeded };
     } catch (error) {
       logger.error('Error seeding protocols', { error: error.message });
       throw error;
@@ -63,8 +65,8 @@ class ProtocolService {
   static async getAvailableProtocols() {
     try {
       const result = await db.query(
-        `SELECT id, slug, name, approach, duration_weeks, total_sessions,
-                target_condition, description, is_active, created_at
+        `SELECT protocol_id, name, modality, duration_weeks, total_sessions,
+                target_condition, description, difficulty_level, is_active, created_at
          FROM therapeutic_protocols
          WHERE is_active = true
          ORDER BY name`
@@ -88,16 +90,16 @@ class ProtocolService {
     try {
       // Check protocol exists
       const protocol = await db.query(
-        `SELECT * FROM therapeutic_protocols WHERE id = $1 AND is_active = true`,
+        `SELECT protocol_id, name FROM therapeutic_protocols WHERE protocol_id = $1 AND is_active = true`,
         [protocolId]
       );
       if (protocol.rows.length === 0) {
         throw new Error('Protocol not found or inactive');
       }
 
-      // Check not already enrolled
+      // Check not already actively enrolled
       const existingEnrollment = await db.query(
-        `SELECT id, status FROM protocol_enrollments
+        `SELECT enrollment_id, status FROM user_protocol_enrollments
          WHERE user_id = $1 AND protocol_id = $2 AND status = 'active'`,
         [userId, protocolId]
       );
@@ -105,14 +107,18 @@ class ProtocolService {
         throw new Error('User is already enrolled in this protocol');
       }
 
-      const enrollmentId = uuidv4();
+      // UNIQUE(user_id, protocol_id): re-enrolling after completing/abandoning
+      // re-activates the existing row rather than failing.
       const result = await db.query(
-        `INSERT INTO protocol_enrollments
-           (id, user_id, protocol_id, status, current_session, current_week,
-            pre_assessment_score, enrolled_at)
-         VALUES ($1, $2, $3, 'active', 1, 1, $4, NOW())
+        `INSERT INTO user_protocol_enrollments
+           (user_id, protocol_id, status, current_session, current_week, pre_assessment_score)
+         VALUES ($1, $2, 'active', 1, 1, $3)
+         ON CONFLICT (user_id, protocol_id) DO UPDATE
+           SET status = 'active', current_session = 1, current_week = 1,
+               started_at = NOW(), completed_at = NULL,
+               pre_assessment_score = EXCLUDED.pre_assessment_score
          RETURNING *`,
-        [enrollmentId, userId, protocolId, preAssessmentScore]
+        [userId, protocolId, preAssessmentScore]
       );
 
       logger.info('User enrolled in protocol', {
@@ -138,8 +144,8 @@ class ProtocolService {
     try {
       const enrollment = await db.query(
         `SELECT e.*, p.sessions, p.name AS protocol_name, p.total_sessions
-         FROM protocol_enrollments e
-         JOIN therapeutic_protocols p ON p.id = e.protocol_id
+         FROM user_protocol_enrollments e
+         JOIN therapeutic_protocols p ON p.protocol_id = e.protocol_id
          WHERE e.user_id = $1 AND e.protocol_id = $2 AND e.status = 'active'`,
         [userId, protocolId]
       );
@@ -157,13 +163,25 @@ class ProtocolService {
         return { status: 'completed', message: 'All sessions have been completed.' };
       }
 
+      // C.2 adaptive pacing: frame the upcoming session from recent difficulty.
+      const recent = await db.query(
+        `SELECT difficulty_rating, mood_before, mood_after, session_number
+         FROM protocol_session_completions
+         WHERE enrollment_id = $1
+         ORDER BY completed_at DESC
+         LIMIT 5`,
+        [row.enrollment_id]
+      );
+      const adaptation = computeAdaptation(recent.rows);
+
       return {
         status: 'ok',
         protocolName: row.protocol_name,
         currentSession: currentSessionNum,
         totalSessions: row.total_sessions,
         currentWeek: row.current_week,
-        session
+        session,
+        adaptation
       };
     } catch (error) {
       logger.error('Error fetching current session', { userId, protocolId, error: error.message });
@@ -183,8 +201,8 @@ class ProtocolService {
     try {
       const enrollment = await db.query(
         `SELECT e.*, p.total_sessions, p.sessions, p.name AS protocol_name
-         FROM protocol_enrollments e
-         JOIN therapeutic_protocols p ON p.id = e.protocol_id
+         FROM user_protocol_enrollments e
+         JOIN therapeutic_protocols p ON p.protocol_id = e.protocol_id
          WHERE e.user_id = $1 AND e.protocol_id = $2 AND e.status = 'active'`,
         [userId, protocolId]
       );
@@ -199,19 +217,31 @@ class ProtocolService {
         throw new Error(`Expected session ${row.current_session}, got ${sessionNumber}`);
       }
 
-      // Record session completion
+      const sessions = typeof row.sessions === 'string' ? JSON.parse(row.sessions) : row.sessions;
+      const completedSession = sessions.find(s => s.session_number === sessionNumber);
+      const weekNumber = completedSession ? completedSession.week : row.current_week;
+
+      // Record session completion incl. difficulty_rating + mood (C.2 consumes these).
       await db.query(
         `INSERT INTO protocol_session_completions
-           (id, enrollment_id, user_id, protocol_id, session_number, completion_data, completed_at)
-         VALUES ($1, $2, $3, $4, $5, $6, NOW())`,
-        [uuidv4(), row.id, userId, protocolId, sessionNumber, JSON.stringify(data)]
+           (enrollment_id, session_number, week_number, mood_before, mood_after,
+            difficulty_rating, notes, exercise_data)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+        [
+          row.enrollment_id,
+          sessionNumber,
+          weekNumber,
+          data.mood_before ?? null,
+          data.mood_after ?? null,
+          data.difficulty_rating ?? null,
+          data.notes ?? null,
+          JSON.stringify(data.exercise_data ?? data.responses ?? {})
+        ]
       );
 
       const totalSessions = row.total_sessions;
       const isLastSession = sessionNumber >= totalSessions;
 
-      // Determine next session and week
-      const sessions = typeof row.sessions === 'string' ? JSON.parse(row.sessions) : row.sessions;
       const nextSessionNum = sessionNumber + 1;
       const nextSession = sessions.find(s => s.session_number === nextSessionNum);
       const nextWeek = nextSession ? nextSession.week : row.current_week;
@@ -219,7 +249,7 @@ class ProtocolService {
       if (isLastSession) {
         // Complete the enrollment
         const updated = await db.query(
-          `UPDATE protocol_enrollments
+          `UPDATE user_protocol_enrollments
            SET status = 'completed', current_session = $3, completed_at = NOW()
            WHERE user_id = $1 AND protocol_id = $2 AND status = 'active'
            RETURNING *`,
@@ -237,7 +267,7 @@ class ProtocolService {
 
       // Advance to next session
       const updated = await db.query(
-        `UPDATE protocol_enrollments
+        `UPDATE user_protocol_enrollments
          SET current_session = $3, current_week = $4
          WHERE user_id = $1 AND protocol_id = $2 AND status = 'active'
          RETURNING *`,
@@ -274,10 +304,10 @@ class ProtocolService {
     try {
       const enrollment = await db.query(
         `SELECT e.*, p.total_sessions, p.duration_weeks, p.name AS protocol_name
-         FROM protocol_enrollments e
-         JOIN therapeutic_protocols p ON p.id = e.protocol_id
+         FROM user_protocol_enrollments e
+         JOIN therapeutic_protocols p ON p.protocol_id = e.protocol_id
          WHERE e.user_id = $1 AND e.protocol_id = $2
-         ORDER BY e.enrolled_at DESC LIMIT 1`,
+         ORDER BY e.started_at DESC LIMIT 1`,
         [userId, protocolId]
       );
 
@@ -292,14 +322,14 @@ class ProtocolService {
         `SELECT COUNT(*) AS completed_count
          FROM protocol_session_completions
          WHERE enrollment_id = $1`,
-        [row.id]
+        [row.enrollment_id]
       );
 
-      const completedCount = parseInt(completions.rows[0].completed_count);
+      const completedCount = parseInt(completions.rows[0].completed_count, 10);
       const totalSessions = row.total_sessions;
 
       // Calculate adherence: completed sessions / expected sessions based on elapsed time
-      const enrolledAt = new Date(row.enrolled_at);
+      const enrolledAt = new Date(row.started_at);
       const now = new Date();
       const daysSinceEnrollment = Math.max(1, Math.floor((now - enrolledAt) / (1000 * 60 * 60 * 24)));
       const sessionsPerWeek = totalSessions / row.duration_weeks;
@@ -318,7 +348,7 @@ class ProtocolService {
         completedSessions: completedCount,
         progressPct: Math.round((completedCount / totalSessions) * 100),
         adherencePct,
-        enrolledAt: row.enrolled_at,
+        startedAt: row.started_at,
         completedAt: row.completed_at
       };
     } catch (error) {
@@ -335,29 +365,29 @@ class ProtocolService {
   static async getUserProtocols(userId) {
     try {
       const result = await db.query(
-        `SELECT e.*, p.name AS protocol_name, p.approach, p.duration_weeks,
+        `SELECT e.*, p.name AS protocol_name, p.modality, p.duration_weeks,
                 p.total_sessions, p.target_condition,
-                (SELECT COUNT(*) FROM protocol_session_completions c WHERE c.enrollment_id = e.id) AS completed_sessions
-         FROM protocol_enrollments e
-         JOIN therapeutic_protocols p ON p.id = e.protocol_id
+                (SELECT COUNT(*) FROM protocol_session_completions c WHERE c.enrollment_id = e.enrollment_id) AS completed_sessions
+         FROM user_protocol_enrollments e
+         JOIN therapeutic_protocols p ON p.protocol_id = e.protocol_id
          WHERE e.user_id = $1
-         ORDER BY e.enrolled_at DESC`,
+         ORDER BY e.started_at DESC`,
         [userId]
       );
 
       return result.rows.map(row => ({
-        enrollmentId: row.id,
+        enrollmentId: row.enrollment_id,
         protocolId: row.protocol_id,
         protocolName: row.protocol_name,
-        approach: row.approach,
+        approach: row.modality,
         targetCondition: row.target_condition,
         status: row.status,
         currentSession: row.current_session,
         currentWeek: row.current_week,
         totalSessions: row.total_sessions,
-        completedSessions: parseInt(row.completed_sessions),
-        progressPct: Math.round((parseInt(row.completed_sessions) / row.total_sessions) * 100),
-        enrolledAt: row.enrolled_at,
+        completedSessions: parseInt(row.completed_sessions, 10),
+        progressPct: Math.round((parseInt(row.completed_sessions, 10) / row.total_sessions) * 100),
+        startedAt: row.started_at,
         completedAt: row.completed_at
       }));
     } catch (error) {
@@ -375,7 +405,7 @@ class ProtocolService {
   static async unenroll(userId, protocolId) {
     try {
       const result = await db.query(
-        `UPDATE protocol_enrollments
+        `UPDATE user_protocol_enrollments
          SET status = 'abandoned', completed_at = NOW()
          WHERE user_id = $1 AND protocol_id = $2 AND status = 'active'
          RETURNING *`,

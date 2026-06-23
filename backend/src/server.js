@@ -184,6 +184,15 @@ const server = httpServer.listen(PORT, () => {
   console.log(`🚀 Mental Health Tracker API is running on port ${PORT}`);
   console.log(`📊 Health check: http://localhost:${PORT}/health`);
   console.log(`🔌 WebSocket server ready for connections`);
+
+  // Seed reference data (the 6 therapeutic protocols) once, idempotently.
+  // Guarded so a DB hiccup never blocks the server from coming up.
+  if (process.env.NODE_ENV !== 'test') {
+    require('./services/protocolService')
+      .seedProtocols()
+      .then((r) => logger.info('Protocol seed on boot', r))
+      .catch((err) => logger.warn('Protocol seed on boot skipped', { error: err.message }));
+  }
 });
 
 // Graceful shutdown

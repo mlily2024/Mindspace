@@ -16,6 +16,7 @@ const Protocols = () => {
   const [view, setView] = useState('list');
   const [selectedProtocol, setSelectedProtocol] = useState(null);
   const [currentSession, setCurrentSession] = useState(null);
+  const [adaptation, setAdaptation] = useState(null);
   const [sessionLoading, setSessionLoading] = useState(false);
 
   // Completion form
@@ -62,6 +63,7 @@ const Protocols = () => {
     try {
       const res = await api.get(`/protocols/${protocolId}/session`);
       setCurrentSession(res.data?.session || res.data);
+      setAdaptation(res.data?.adaptation || null);
       setSelectedProtocol(protocolId);
       setView('session');
       setShowComplete(false);
@@ -81,11 +83,12 @@ const Protocols = () => {
       await api.post(`/protocols/${selectedProtocol}/complete`, {
         moodBefore,
         moodAfter,
-        difficulty
+        difficultyRating: difficulty
       });
       await loadData();
       setView('list');
       setCurrentSession(null);
+      setAdaptation(null);
       setSelectedProtocol(null);
     } catch (err) {
       setError(err.message || 'Failed to complete session');
@@ -281,6 +284,30 @@ const Protocols = () => {
             <div style={{ textAlign: 'center', padding: '40px', color: '#9B8AA5' }}>Loading session...</div>
           ) : (
             <>
+              {/* C.2 adaptive pacing: gentle framing from the user's recent difficulty ratings */}
+              {adaptation && (
+                <div style={{
+                  ...cardStyle,
+                  background: adaptation.level === 'ease' ? '#EEF3FA' : '#FDF3EC',
+                  borderColor: adaptation.level === 'ease' ? 'rgba(155, 138, 165, 0.35)' : 'rgba(245, 201, 179, 0.6)',
+                  display: 'flex',
+                  gap: '12px',
+                  alignItems: 'flex-start'
+                }}>
+                  <span style={{ fontSize: '1.3rem', lineHeight: 1.2 }} aria-hidden="true">
+                    {adaptation.level === 'ease' ? '🌿' : '✨'}
+                  </span>
+                  <div>
+                    <div style={{ fontWeight: 600, color: '#4A3F55', marginBottom: '4px', fontSize: '0.95rem' }}>
+                      {adaptation.title}
+                    </div>
+                    <div style={{ color: '#6b5f7a', fontSize: '0.85rem', lineHeight: 1.55 }}>
+                      {adaptation.message}
+                    </div>
+                  </div>
+                </div>
+              )}
+
               <div style={cardStyle}>
                 <h2 style={{
                   fontSize: 'var(--font-size-xl, 1.25rem)',

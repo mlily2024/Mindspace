@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { useAuth } from '../context/AuthContext';
 
 const Navigation = () => {
   const { user: _user, logout } = useAuth();
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const location = useLocation();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -38,15 +40,15 @@ const Navigation = () => {
   // labelling without hiding any feature; assessor sees the whole surface
   // in one nav, badges signal maturity.
   const navLinks = [
-    { to: '/dashboard',       label: 'Home',     icon: '🏠', tier: 'core' },
-    { to: '/mood-tracker',    label: 'Check In', icon: '✨', tier: 'core' },
-    { to: '/journal',         label: 'Journal',  icon: '📝', tier: 'core' },
-    { to: '/insights',        label: 'Insights', icon: '🌟', tier: 'core' },
-    { to: '/recommendations', label: 'Self-Care', icon: '💜', tier: 'beta' },
-    { to: '/assessments',     label: 'Screening', icon: '📋', tier: 'beta' },
-    { to: '/wearables',       label: 'Wearables', icon: '⌚', tier: 'experimental', badge: 'Mock data' },
-    { to: '/peer-support',    label: 'Community', icon: '🤝', tier: 'beta' },
-    { to: '/settings',        label: 'Settings', icon: '⚙️', tier: 'core' }
+    { to: '/dashboard',       label: t('nav.home'),      icon: '🏠', tier: 'core' },
+    { to: '/mood-tracker',    label: t('nav.checkIn'),   icon: '✨', tier: 'core' },
+    { to: '/journal',         label: t('nav.journal'),   icon: '📝', tier: 'core' },
+    { to: '/insights',        label: t('nav.insights'),  icon: '🌟', tier: 'core' },
+    { to: '/recommendations', label: t('nav.selfCare'),  icon: '💜', tier: 'beta' },
+    { to: '/assessments',     label: t('nav.screening'), icon: '📋', tier: 'beta' },
+    { to: '/wearables',       label: t('nav.wearables'), icon: '⌚', tier: 'experimental', badge: t('badge.mockData') },
+    { to: '/peer-support',    label: t('nav.community'), icon: '🤝', tier: 'beta' },
+    { to: '/settings',        label: t('nav.settings'),  icon: '⚙️', tier: 'core' }
   ];
 
   // Tiny pill, deliberately small + low-contrast so it informs without
@@ -236,14 +238,14 @@ const Navigation = () => {
             <li>
               <Link to="/crisis-resources" style={crisisStyle}>
                 <span role="img" aria-hidden="true">💚</span>
-                <span>Support</span>
+                <span>{t('nav.support')}</span>
               </Link>
             </li>
             <li style={{ marginLeft: 'var(--spacing-sm)' }}>
               <button
                 onClick={handleLogout}
                 style={logoutBtnStyle}
-                aria-label="Logout"
+                aria-label={t('nav.logout')}
                 onMouseEnter={(e) => {
                   e.target.style.background = 'rgba(255,255,255,0.25)';
                   e.target.style.borderColor = 'rgba(255,255,255,0.8)';
@@ -253,7 +255,7 @@ const Navigation = () => {
                   e.target.style.borderColor = 'rgba(255,255,255,0.5)';
                 }}
               >
-                Logout
+                {t('nav.logout')}
               </button>
             </li>
           </ul>
@@ -291,7 +293,7 @@ const Navigation = () => {
                   onClick={() => setMobileMenuOpen(false)}
                 >
                   <span role="img" aria-hidden="true">💚</span>
-                  <span>Crisis Support</span>
+                  <span>{t('nav.crisisSupport')}</span>
                 </Link>
               </li>
               <li style={{ marginTop: 'var(--spacing-sm)' }}>
@@ -299,7 +301,7 @@ const Navigation = () => {
                   onClick={handleLogout}
                   style={logoutBtnStyle}
                 >
-                  Logout
+                  {t('nav.logout')}
                 </button>
               </li>
             </ul>

@@ -1,0 +1,20 @@
+{
+  "brand": "MindSpace",
+  "nav": {
+    "home": "Home",
+    "checkIn": "Check In",
+    "journal": "Journal",
+    "insights": "Insights",
+    "selfCare": "Self-Care",
+    "screening": "Screening",
+    "wearables": "Wearables",
+    "community": "Community",
+    "settings": "Settings",
+    "support": "Support",
+    "crisisSupport": "Crisis Support",
+    "logout": "Logout"
+  },
+  "badge": {
+    "mockData": "Mock data"
+  }
+}

@@ -46,6 +46,8 @@ const historyValidation = [
 router.get('/', assessmentController.getAvailableAssessments);
 router.get('/due', assessmentController.checkDue);
 router.get('/scores', assessmentController.getLatestScores);
+// Care-escalation tier + routing (ADR-0013) — before /:instrument so it isn't captured as one
+router.get('/escalation', assessmentController.getEscalation);
 router.get('/:instrument', instrumentValidation, validate, assessmentController.getAssessment);
 router.post('/:instrument/submit', submitValidation, validate, assessmentController.submitResponse);
 router.get('/:instrument/history', historyValidation, validate, assessmentController.getHistory);

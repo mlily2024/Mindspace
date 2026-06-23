@@ -9,6 +9,7 @@ const {
 } = require('../data/screeningInstruments');
 const { UK_CRISIS_RESOURCES } = require('../services/safetyFilter');
 const { computeRCI } = require('../utils/reliableChange');
+const careEscalationService = require('../services/careEscalationService');
 
 /**
  * Assessment controller — wires the /api/assessments routes onto
@@ -277,6 +278,18 @@ const submitResponse = async (req, res, next) => {
       crisisAlertId = await recordCrisisAlert(userId, instrument, created);
     }
 
+    // Care escalation (ADR-0013): tiered routing that AUGMENTS — never replaces
+    // — the crisis path above. Evaluate the user's current tier and persist an
+    // escalation row for crisis/elevated (cooldown-guarded). Non-blocking: a
+    // failure here must never make the user's submission look failed.
+    let escalation = null;
+    try {
+      escalation = await careEscalationService.evaluate(userId);
+      await careEscalationService.recordIfNeeded(userId, escalation);
+    } catch (e) {
+      logger.error('Care escalation evaluation failed (non-blocking)', { userId, error: e.message });
+    }
+
     res.status(201).json({
       success: true,
       data: {
@@ -293,6 +306,9 @@ const submitResponse = async (req, res, next) => {
         crisis_alert_id:  crisisAlertId,
         crisis_message:   created.has_crisis_flag
           ? "Thank you for sharing that with us. You marked an item about thoughts of being better off dead or hurting yourself. Please consider reaching out to one of the UK services below — they have people trained to help."
+          : null,
+        escalation:       escalation
+          ? { tier: escalation.tier, reasons: escalation.reasons, pathways: escalation.pathways }
           : null,
       },
     });
@@ -403,6 +419,21 @@ const checkDue = async (req, res, next) => {
   }
 };
 
+/**
+ * GET /api/assessments/escalation
+ * The user's current care-escalation tier (crisis | elevated | monitor) with
+ * step-up routing (ADR-0013). Read-only; augments the crisis path.
+ */
+const getEscalation = async (req, res, next) => {
+  try {
+    const evaluation = await careEscalationService.evaluate(req.user.userId);
+    res.json({ success: true, data: evaluation });
+  } catch (error) {
+    logger.error('Error evaluating care escalation', { error: error.message });
+    next(error);
+  }
+};
+
 module.exports = {
   getAvailableAssessments,
   getAssessment,
@@ -410,4 +441,5 @@ module.exports = {
   getHistory,
   getLatestScores,
   checkDue,
+  getEscalation,
 };

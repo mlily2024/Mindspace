@@ -63,3 +63,7 @@ build/
 *.sqlite
 .local-backups/
 backend/.local-backups/
+
+# Python (Chronos sidecar — ADR-0012)
+__pycache__/
+*.pyc

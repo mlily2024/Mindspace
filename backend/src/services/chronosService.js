@@ -23,10 +23,20 @@ const TIMEOUT_MS = Number(process.env.CHRONOS_TIMEOUT_MS || 60000);
 const MIN_SERIES = 3; // need a few points before Chronos is worthwhile
 const MAX_CONTEXT = 180; // cap the context window fed to the model
 
-// Opt-in: only attempt Chronos when explicitly enabled (it needs torch + the
-// model installed, which most hosts — incl. the free-tier demo — do not have).
-function chronosEnabled() {
-  return String(process.env.CHRONOS_ENABLED).toLowerCase() === 'true';
+// Chronos is opt-in (it needs torch + the model, which most hosts — incl. the
+// free-tier demo — do not have). Two ways to enable it:
+//   CHRONOS_URL=http://chronos:8001  -> call the persistent sidecar over HTTP
+//                                       (model loaded once; ~35ms warm). PREFERRED.
+//   CHRONOS_ENABLED=true             -> spawn predict_chronos.py per request
+//                                       (reloads the model each call; batch-only).
+// Read at call time so tests/config can flip it without re-requiring the module.
+function chronosUrl() {
+  return (process.env.CHRONOS_URL || '').replace(/\/+$/, '');
+}
+function chronosMode() {
+  if (chronosUrl()) return 'http';
+  if (String(process.env.CHRONOS_ENABLED).toLowerCase() === 'true') return 'spawn';
+  return null;
 }
 
 const clampMood = (v) => Math.min(10, Math.max(1, Math.round(v * 100) / 100));
@@ -88,6 +98,29 @@ class ChronosService {
     });
   }
 
+  /** Call the persistent sidecar over HTTP. Resolves {p10,p50,p90} or rejects. */
+  static async _httpForecast(series, horizon) {
+    const url = `${chronosUrl()}/forecast`;
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
+    try {
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ series, horizon }),
+        signal: controller.signal,
+      });
+      if (!res.ok) throw new Error(`chronos sidecar HTTP ${res.status}`);
+      const parsed = await res.json();
+      if (!parsed || !Array.isArray(parsed.p50)) {
+        throw new Error('chronos sidecar malformed output');
+      }
+      return parsed;
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+
   /** Fall back to the regression engine, tagging the source. */
   static async _fallback(userId, daysAhead, reason) {
     if (reason) logger.info('chronosService falling back to regression engine', { userId, reason });
@@ -108,7 +141,8 @@ class ChronosService {
    * @returns {Promise<Array<{date, predictedMood, confidenceInterval:{low,high}, source}>>}
    */
   static async generatePredictions(userId, daysAhead = 7) {
-    if (!chronosEnabled()) {
+    const mode = chronosMode();
+    if (!mode) {
       return this._fallback(userId, daysAhead, 'disabled');
     }
     try {
@@ -116,7 +150,9 @@ class ChronosService {
       if (series.length < MIN_SERIES) {
         return this._fallback(userId, daysAhead, 'insufficient_history');
       }
-      const { p10, p50, p90 } = await this._runChronos(series, daysAhead);
+      const { p10, p50, p90 } = mode === 'http'
+        ? await this._httpForecast(series, daysAhead)
+        : await this._runChronos(series, daysAhead);
       const today = new Date();
       return p50.map((mid, i) => {
         const date = new Date(today);

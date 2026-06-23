@@ -1,4 +1,5 @@
 const predictionService = require('../services/predictiveEngineService');
+const chronosService = require('../services/chronosService');
 const logger = require('../config/logger');
 
 /**
@@ -68,9 +69,32 @@ const getAccuracy = async (req, res, next) => {
   }
 };
 
+/**
+ * Get a foundation-model (Chronos) mood forecast with p10/p50/p90 bands.
+ * Transparently falls back to the regression engine; the `source` field records
+ * which engine produced the result (chronos | regression_fallback). (ADR-0012)
+ */
+const getForecast = async (req, res, next) => {
+  try {
+    const days = req.query.days ? parseInt(req.query.days) : 7;
+    const forecast = await chronosService.generatePredictions(req.user.userId, days);
+
+    // generatePredictions returns an array of points, or a status object
+    // ({status, message}) passed through from the regression engine.
+    if (!Array.isArray(forecast)) {
+      return res.json({ success: true, data: forecast });
+    }
+    const source = forecast.length ? forecast[0].source : 'regression_fallback';
+    res.json({ success: true, data: { source, forecast } });
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   getPredictions,
   trainModel,
   getModelInfo,
-  getAccuracy
+  getAccuracy,
+  getForecast
 };

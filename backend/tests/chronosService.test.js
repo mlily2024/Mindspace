@@ -46,6 +46,7 @@ describe('chronosService', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    delete process.env.CHRONOS_URL; // spawn/disabled tests must not see an HTTP url
     PredictiveEngineService.generatePredictions.mockResolvedValue(REG_PREDS);
     db.query.mockResolvedValue({
       rows: [
@@ -126,6 +127,56 @@ describe('chronosService', () => {
       PredictiveEngineService.generatePredictions.mockResolvedValue({ status: 'no_model', message: 'none' });
       const out = await ChronosService.generatePredictions('u1', 2);
       expect(out).toEqual({ status: 'no_model', message: 'none' });
+    });
+  });
+
+  describe('http mode (persistent sidecar)', () => {
+    let originalFetch;
+    beforeEach(() => {
+      process.env.CHRONOS_URL = 'http://chronos:8001';
+      originalFetch = global.fetch;
+      global.fetch = jest.fn();
+    });
+    afterEach(() => { global.fetch = originalFetch; });
+
+    it('uses the sidecar over HTTP (no spawn) and returns chronos forecasts', async () => {
+      global.fetch.mockResolvedValue({
+        ok: true,
+        json: async () => ({ p10: [4, 4.2], p50: [6, 6.5], p90: [8, 8.3] }),
+      });
+      const out = await ChronosService.generatePredictions('u1', 2);
+      expect(global.fetch).toHaveBeenCalledTimes(1);
+      expect(global.fetch.mock.calls[0][0]).toBe('http://chronos:8001/forecast');
+      expect(spawn).not.toHaveBeenCalled();
+      expect(out[0].source).toBe('chronos');
+      expect(out[0].predictedMood).toBe(6);
+      expect(out[0].confidenceInterval).toEqual({ low: 4, high: 8 });
+    });
+
+    it('falls back when the sidecar returns a non-200', async () => {
+      global.fetch.mockResolvedValue({ ok: false, status: 503, json: async () => ({}) });
+      const out = await ChronosService.generatePredictions('u1', 2);
+      expect(out.every((p) => p.source === 'regression_fallback')).toBe(true);
+    });
+
+    it('falls back when the sidecar is unreachable', async () => {
+      global.fetch.mockRejectedValue(new Error('ECONNREFUSED'));
+      const out = await ChronosService.generatePredictions('u1', 2);
+      expect(out.every((p) => p.source === 'regression_fallback')).toBe(true);
+    });
+
+    it('falls back on malformed sidecar output', async () => {
+      global.fetch.mockResolvedValue({ ok: true, json: async () => ({ nope: true }) });
+      const out = await ChronosService.generatePredictions('u1', 2);
+      expect(out.every((p) => p.source === 'regression_fallback')).toBe(true);
+    });
+
+    it('prefers HTTP even when CHRONOS_ENABLED is also set (no spawn)', async () => {
+      process.env.CHRONOS_ENABLED = 'true';
+      global.fetch.mockResolvedValue({ ok: true, json: async () => ({ p10: [5], p50: [6], p90: [7] }) });
+      await ChronosService.generatePredictions('u1', 1);
+      expect(global.fetch).toHaveBeenCalled();
+      expect(spawn).not.toHaveBeenCalled();
     });
   });
 });

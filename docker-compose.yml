@@ -61,6 +61,11 @@ services:
       VAPID_PUBLIC_KEY: ${VAPID_PUBLIC_KEY:-}
       VAPID_PRIVATE_KEY: ${VAPID_PRIVATE_KEY:-}
       VAPID_SUBJECT: ${VAPID_SUBJECT:-mailto:noreply@mindspace.local}
+      # Optional: Chronos foundation-model forecasting sidecar (ADR-0012).
+      # Empty by default -> backend uses the regression engine. Set to
+      # http://chronos:8001 + run `--profile chronos` to enable real forecasts.
+      CHRONOS_URL: ${CHRONOS_URL:-}
+      CHRONOS_TIMEOUT_MS: ${CHRONOS_TIMEOUT_MS:-60000}
     ports:
       - "5000:5000"
     depends_on:
@@ -78,5 +83,22 @@ services:
     depends_on:
       - backend
 
+  # Foundation-model forecasting sidecar (ADR-0012). OPT-IN via the `chronos`
+  # profile (heavy PyTorch image): `docker compose --profile chronos up --build`.
+  # The backend reaches it at http://chronos:8001 when CHRONOS_URL is set;
+  # otherwise (default) the backend silently uses the regression engine.
+  chronos:
+    build: ./backend/python
+    restart: unless-stopped
+    profiles: ["chronos"]
+    environment:
+      CHRONOS_HOST: 0.0.0.0
+      CHRONOS_PORT: 8001
+    expose:
+      - "8001"
+    volumes:
+      - chronos_models:/root/.cache/huggingface
+
 volumes:
   pgdata:
+  chronos_models:

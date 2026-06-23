@@ -120,6 +120,31 @@ describe('cacheService', () => {
     });
   });
 
+  describe('cross-instance invalidation (F.7)', () => {
+    it('runs single-instance by default (no REDIS_URL → fan-out disabled)', () => {
+      expect(cache._invalidationBackend.enabled).toBe(false);
+    });
+
+    it('_applyInvalidation drops a peer-invalidated user locally (no re-publish)', () => {
+      cache.short.set(cache.key('insights', 'u1'), 'a');
+      cache.short.set(cache.key('stats', 'u1', '2026'), 'b');
+      cache.short.set(cache.key('insights', 'u2'), 'c');
+
+      cache._applyInvalidation({ tier: 'short', op: 'delByUser', userId: 'u1' });
+
+      expect(cache.short.has(cache.key('insights', 'u1'))).toBe(false);
+      expect(cache.short.has(cache.key('stats', 'u1', '2026'))).toBe(false);
+      expect(cache.short.has(cache.key('insights', 'u2'))).toBe(true);
+    });
+
+    it('_applyInvalidation handles clear and unknown tiers safely', () => {
+      cache.long.set(cache.key('l', 'u1'), 'b');
+      cache._applyInvalidation({ tier: 'long', op: 'clear' });
+      expect(cache.long.size()).toBe(0);
+      expect(() => cache._applyInvalidation({ tier: 'nope', op: 'clear' })).not.toThrow();
+    });
+  });
+
   describe('wrap()', () => {
     it('invokes the producer on cache miss, caches the result', async () => {
       const producer = jest.fn().mockResolvedValue('fresh-value');

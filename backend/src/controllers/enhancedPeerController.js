@@ -1,14 +1,13 @@
 const logger = require('../config/logger');
+const enhancedPeerService = require('../services/enhancedPeerService');
 
 /**
- * Get the current user's pattern profile
+ * Get (compute) the current user's 30-day mood pattern profile.
  */
 const getPatternProfile = async (req, res, next) => {
   try {
-    const userId = req.user.userId;
-
-    // TODO: implement with EnhancedPeer model
-    res.json({ success: true, data: { userId } });
+    const profile = await enhancedPeerService.computePatternProfile(req.user.userId);
+    res.json({ success: true, data: profile });
   } catch (error) {
     logger.error('Error fetching pattern profile', { error: error.message });
     next(error);
@@ -16,14 +15,13 @@ const getPatternProfile = async (req, res, next) => {
 };
 
 /**
- * Find pattern-based matches for the current user
+ * Find pattern-based (same-cluster) peer matches for the current user.
  */
 const findMatches = async (req, res, next) => {
   try {
-    const _userId = req.user.userId;
-
-    // TODO: implement with EnhancedPeer model
-    res.json({ success: true, data: [] });
+    const limit = Math.min(50, Math.max(1, parseInt(req.query.limit, 10) || 10));
+    const matches = await enhancedPeerService.findPatternMatches(req.user.userId, limit);
+    res.json({ success: true, data: matches });
   } catch (error) {
     logger.error('Error finding matches', { error: error.message });
     next(error);
@@ -31,14 +29,12 @@ const findMatches = async (req, res, next) => {
 };
 
 /**
- * Suggest a group for the current user based on patterns
+ * Suggest the peer archetype for the user's current pattern cluster.
  */
 const suggestGroup = async (req, res, next) => {
   try {
-    const userId = req.user.userId;
-
-    // TODO: implement with EnhancedPeer model
-    res.json({ success: true, data: { userId } });
+    const suggestion = await enhancedPeerService.suggestGroup(req.user.userId);
+    res.json({ success: true, data: suggestion });
   } catch (error) {
     logger.error('Error suggesting group', { error: error.message });
     next(error);

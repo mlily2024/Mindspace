@@ -345,6 +345,11 @@ const Assessments = () => {
             />
           )}
 
+          {/* Step-up-to-care card for the ELEVATED tier (ADR-0013). The crisis
+              tier is covered by the banner above; this is the amber, non-alarming
+              "consider some extra support" routing. */}
+          {!result.has_crisis_flag && <StepUpCard escalation={result.escalation} />}
+
           <div style={{ ...cardStyle, textAlign: 'center', padding: 'var(--spacing-xl, 32px)' }}>
             <h2 style={{ ...headerStyle, marginBottom: '8px' }}>Results: {activeInstrument}</h2>
 
@@ -561,6 +566,63 @@ const Assessments = () => {
  * UI stays consistent with whatever SafetyFilter / future locale work
  * decides — no second source of truth.
  */
+/**
+ * StepUpCard — the ELEVATED-tier "consider some extra support" routing (ADR-0013).
+ * Amber and non-alarming; renders ONLY for the elevated tier (the crisis tier is
+ * handled by CrisisBanner). Copy stays gentle and option-offering, never directive.
+ */
+const StepUpCard = ({ escalation }) => {
+  if (!escalation || escalation.tier !== 'elevated') return null;
+  const { reasons = [], pathways = [] } = escalation;
+  const telHref = (s) => `tel:${String(s).replace(/[^\d+]/g, '')}`;
+  return (
+    <div
+      role="region"
+      aria-label="Support options"
+      style={{
+        background: 'linear-gradient(180deg, #FFFBF0 0%, #FFF6E0 100%)',
+        border: '1px solid #F0D08A',
+        borderLeft: '5px solid #D9A640',
+        borderRadius: 'var(--radius-lg, 16px)',
+        padding: 'var(--spacing-lg, 20px)',
+        marginBottom: 'var(--spacing-md, 16px)',
+        boxShadow: '0 2px 12px rgba(217, 166, 64, 0.10)',
+      }}
+    >
+      <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
+        <span aria-hidden="true" style={{ fontSize: '1.3rem', lineHeight: 1.2, marginTop: 2 }}>🌱</span>
+        <div style={{ flex: 1 }}>
+          <div style={{ fontSize: '1.05rem', fontWeight: 600, color: '#7B5A0E', marginBottom: '6px' }}>
+            It might help to reach out for some support
+          </div>
+          {reasons.length > 0 && (
+            <p style={{ fontSize: '0.92rem', color: '#5A4A0E', lineHeight: 1.55, margin: '0 0 12px' }}>
+              {reasons.join(' ')} There&apos;s no pressure — these are options if you&apos;d like them.
+            </p>
+          )}
+          <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: '10px' }}>
+            {pathways.map((p, i) => (
+              <li key={i} style={{ fontSize: '0.92rem', color: '#4A3F55' }}>
+                <strong>{p.name}</strong>
+                {p.phone && (
+                  <> — <a href={telHref(p.phone)} style={{ color: '#7B5A0E', fontWeight: 600, textDecoration: 'underline' }}>{p.phone}</a></>
+                )}
+                {p.url && (
+                  <> — <a href={p.url} target="_blank" rel="noopener noreferrer" style={{ color: '#7B5A0E', fontWeight: 600, textDecoration: 'underline' }}>refer yourself</a></>
+                )}
+                {p.note && <div style={{ color: '#6b5f7a', fontSize: '0.83rem', marginTop: 2 }}>{p.note}</div>}
+              </li>
+            ))}
+          </ul>
+          <p style={{ marginTop: '12px', fontSize: '0.8rem', color: '#6b5f7a', fontStyle: 'italic' }}>
+            This is general guidance based on your screening scores, not a diagnosis.
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 const CrisisBanner = ({ message, resources, alertId }) => {
   const looksLikePhone = (s) => /^\s*[\d\s+()-]+\s*$/.test(String(s));
   const telHref = (s) => `tel:${String(s).replace(/[^\d+]/g, '')}`;

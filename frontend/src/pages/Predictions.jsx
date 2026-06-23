@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import Navigation from '../components/Navigation';
+import MoodForecastChart from '../components/MoodForecastChart';
 import api from '../services/api';
 
 /**
@@ -275,6 +276,9 @@ const Predictions = () => {
             </button>
           </div>
         )}
+
+        {/* Probabilistic forecast fan chart (Chronos foundation model / regression) */}
+        {!loading && <MoodForecastChart />}
 
         {/* Prediction Cards */}
         {!loading && predictions.length > 0 && (

@@ -136,6 +136,9 @@ jobs:
       - name: Lint
         run: npm run lint
 
+      - name: Test (Vitest)
+        run: npm test
+
       - name: Build (Vite production bundle)
         env:
           VITE_API_BASE_URL: http://localhost:5000/api

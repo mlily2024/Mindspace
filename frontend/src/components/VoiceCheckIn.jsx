@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { voiceAPI } from '../services/api';
+import { extractFeatures } from '../utils/voiceFeatures';
 
 /**
  * VoiceCheckIn - Voice emotion analysis component
@@ -141,146 +142,29 @@ const VoiceCheckIn = ({ onAnalysisComplete, onCancel }) => {
 
       setAnalysis(response.data);
     } catch (err) {
-      setError('Unable to analyze recording. Please try again.');
+      // Surface the specific reason (e.g. "No speech detected") when the on-device
+      // DSP rejects the audio, rather than a generic message — and never persist
+      // fabricated features.
+      setError(err?.message || 'Unable to analyze recording. Please try again.');
     } finally {
       setIsAnalyzing(false);
     }
   };
 
   const extractAudioFeatures = async (audioBlob) => {
-    // Intentional async executor: wraps async Web Audio API calls.
-    // eslint-disable-next-line no-async-promise-executor
-    return new Promise(async (resolve) => {
-      // In a real implementation, we'd use the Web Audio API to extract
-      // actual acoustic features. For MVP, we'll use simplified analysis.
-      const audioContext = new (window.AudioContext || window.webkitAudioContext)();
-
-      try {
-        const arrayBuffer = await audioBlob.arrayBuffer();
-        const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
-
-        const channelData = audioBuffer.getChannelData(0);
-        const sampleRate = audioBuffer.sampleRate;
-
-        // Calculate features
-        const features = {
-          pitch: calculateEstimatedPitch(channelData, sampleRate),
-          pitchVariation: calculatePitchVariation(channelData, sampleRate),
-          speechRate: estimateSpeechRate(channelData, sampleRate),
-          volume: calculateAverageVolume(channelData),
-          pauseFrequency: calculatePauseFrequency(channelData, sampleRate),
-          duration: audioBuffer.duration
-        };
-
-        audioContext.close();
-        resolve(features);
-      } catch {
-        // Fallback to simulated features if audio processing fails
-        resolve({
-          pitch: 150 + Math.random() * 50,
-          pitchVariation: 30 + Math.random() * 20,
-          speechRate: 120 + Math.random() * 40,
-          volume: 0.3 + Math.random() * 0.4,
-          pauseFrequency: 0.1 + Math.random() * 0.2,
-          duration: recordingTime
-        });
-      }
-    });
-  };
-
-  // Simplified pitch estimation using zero-crossing rate
-  const calculateEstimatedPitch = (channelData, sampleRate) => {
-    let zeroCrossings = 0;
-    for (let i = 1; i < channelData.length; i++) {
-      if ((channelData[i] >= 0 && channelData[i - 1] < 0) ||
-          (channelData[i] < 0 && channelData[i - 1] >= 0)) {
-        zeroCrossings++;
-      }
+    // Decode in the browser, then run the pure, testable DSP in utils/voiceFeatures.
+    // extractFeatures throws on unusable audio (too short / silent / unvoiced); we let
+    // that propagate so analyzeRecording surfaces an error rather than fabricating
+    // features (the previous Math.random fallback) into the user's mood baseline.
+    const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+    try {
+      const arrayBuffer = await audioBlob.arrayBuffer();
+      const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+      const channelData = audioBuffer.getChannelData(0);
+      return extractFeatures(channelData, audioBuffer.sampleRate, audioBuffer.duration);
+    } finally {
+      audioContext.close();
     }
-    const frequency = (zeroCrossings / 2) / (channelData.length / sampleRate);
-    return Math.max(80, Math.min(300, frequency)); // Typical voice range
-  };
-
-  // Estimate pitch variation using standard deviation of short-term pitch
-  const calculatePitchVariation = (channelData, sampleRate) => {
-    const windowSize = Math.floor(sampleRate * 0.1); // 100ms windows
-    const pitches = [];
-
-    for (let i = 0; i < channelData.length - windowSize; i += windowSize) {
-      const window = channelData.slice(i, i + windowSize);
-      let zeroCrossings = 0;
-      for (let j = 1; j < window.length; j++) {
-        if ((window[j] >= 0 && window[j - 1] < 0) ||
-            (window[j] < 0 && window[j - 1] >= 0)) {
-          zeroCrossings++;
-        }
-      }
-      const pitch = (zeroCrossings / 2) / (windowSize / sampleRate);
-      if (pitch > 50 && pitch < 400) {
-        pitches.push(pitch);
-      }
-    }
-
-    if (pitches.length < 2) return 30;
-    const mean = pitches.reduce((a, b) => a + b, 0) / pitches.length;
-    const variance = pitches.reduce((sum, p) => sum + Math.pow(p - mean, 2), 0) / pitches.length;
-    return Math.sqrt(variance);
-  };
-
-  // Estimate speech rate using energy patterns
-  const estimateSpeechRate = (channelData, sampleRate) => {
-    const windowSize = Math.floor(sampleRate * 0.05); // 50ms windows
-    const energies = [];
-
-    for (let i = 0; i < channelData.length - windowSize; i += windowSize) {
-      const window = channelData.slice(i, i + windowSize);
-      const energy = window.reduce((sum, s) => sum + s * s, 0) / window.length;
-      energies.push(energy);
-    }
-
-    // Count peaks (syllables approximation)
-    const threshold = Math.max(...energies) * 0.3;
-    let peaks = 0;
-    for (let i = 1; i < energies.length - 1; i++) {
-      if (energies[i] > threshold &&
-          energies[i] > energies[i - 1] &&
-          energies[i] > energies[i + 1]) {
-        peaks++;
-      }
-    }
-
-    const durationSeconds = channelData.length / sampleRate;
-    const syllablesPerSecond = peaks / durationSeconds;
-    return syllablesPerSecond * 40; // Approximate words per minute
-  };
-
-  const calculateAverageVolume = (channelData) => {
-    const sum = channelData.reduce((a, b) => a + Math.abs(b), 0);
-    return sum / channelData.length;
-  };
-
-  const calculatePauseFrequency = (channelData, sampleRate) => {
-    const windowSize = Math.floor(sampleRate * 0.1); // 100ms windows
-    const silenceThreshold = 0.01;
-    let pauseCount = 0;
-    let inPause = false;
-
-    for (let i = 0; i < channelData.length - windowSize; i += windowSize) {
-      const window = channelData.slice(i, i + windowSize);
-      const energy = window.reduce((sum, s) => sum + Math.abs(s), 0) / window.length;
-
-      if (energy < silenceThreshold) {
-        if (!inPause) {
-          pauseCount++;
-          inPause = true;
-        }
-      } else {
-        inPause = false;
-      }
-    }
-
-    const durationSeconds = channelData.length / sampleRate;
-    return pauseCount / durationSeconds;
   };
 
   const handleAcceptAnalysis = () => {

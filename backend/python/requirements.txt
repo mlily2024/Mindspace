@@ -1,0 +1,8 @@
+# Python dependencies for the Chronos-Bolt mood forecaster (ADR-0012).
+# Only needed where Chronos forecasting is actually run — the Node service
+# falls back to the regression engine when these are absent.
+#
+# Install:  python -m pip install -r backend/python/requirements.txt
+# CPU-only torch is sufficient (small model, CPU inference).
+torch>=2.1,<3
+chronos-forecasting>=1.4,<2

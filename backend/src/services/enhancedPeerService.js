@@ -30,6 +30,21 @@ const CLUSTER_LABELS = {
   4: 'On the Rise',
 };
 
+// Allowed structured-exercise types.
+const EXERCISE_TYPES = [
+  'gratitude_round',
+  'coping_strategy_share',
+  'weekly_challenge',
+  'check_in_circle',
+  'mindful_moment',
+];
+
+function httpError(status, message) {
+  const err = new Error(message);
+  err.status = status;
+  return err;
+}
+
 function classifyPattern(avgMood, variability, trendSlope) {
   if (variability > 2.0) return 2; // volatile (overrides)
   if (trendSlope < -0.05) return 3; // declining
@@ -67,6 +82,17 @@ function normaliseTriggers(raw) {
     }
   }
   return [];
+}
+
+/** Read-only membership check against the LIVE group_members table (never mutated here). */
+async function isActiveGroupMember(userId, groupId) {
+  const { rows } = await db.query(
+    `SELECT 1 FROM group_members
+      WHERE group_id = $1 AND user_id = $2 AND is_active = TRUE
+      LIMIT 1`,
+    [groupId, userId]
+  );
+  return rows.length > 0;
 }
 
 const enhancedPeerService = {
@@ -201,10 +227,93 @@ const enhancedPeerService = {
     };
   },
 
+  // ── Structured group exercises (members only) ────────────────────────────────
+
+  /**
+   * Create a structured exercise for a group. The caller must be an active member.
+   * group_id is an FK into the LIVE peer_support_groups (referenced, not modified).
+   */
+  async createStructuredExercise(userId, groupId, exerciseType, title, description, scheduledAt) {
+    if (!EXERCISE_TYPES.includes(exerciseType)) {
+      throw httpError(400, `Invalid exercise type. Must be one of: ${EXERCISE_TYPES.join(', ')}`);
+    }
+    if (!(await isActiveGroupMember(userId, groupId))) {
+      throw httpError(403, 'You must be a member of this group to create an exercise.');
+    }
+    const { rows } = await db.query(
+      `INSERT INTO peer_structured_exercises
+         (group_id, exercise_type, title, description, scheduled_at, created_by)
+       VALUES ($1, $2, $3, $4, $5, $6)
+       RETURNING exercise_id, group_id, exercise_type, title, description,
+                 scheduled_at, status, participation_count, created_at`,
+      [groupId, exerciseType, title, description ?? null, scheduledAt ?? null, userId]
+    );
+    return rows[0];
+  },
+
+  /** List a group's exercises (members only), each with a response count. */
+  async getGroupExercises(userId, groupId) {
+    if (!(await isActiveGroupMember(userId, groupId))) {
+      throw httpError(403, 'You must be a member of this group to view its exercises.');
+    }
+    const { rows } = await db.query(
+      `SELECT e.exercise_id, e.group_id, e.exercise_type, e.title, e.description,
+              e.scheduled_at, e.status, e.created_at,
+              COUNT(r.response_id)::int AS response_count
+         FROM peer_structured_exercises e
+         LEFT JOIN peer_exercise_responses r ON r.exercise_id = e.exercise_id
+        WHERE e.group_id = $1
+        GROUP BY e.exercise_id
+        ORDER BY e.scheduled_at DESC NULLS LAST, e.created_at DESC`,
+      [groupId]
+    );
+    return rows;
+  },
+
+  /** Record a response to an exercise. Caller must be a member of the exercise's group. */
+  async submitExerciseResponse(userId, exerciseId, content) {
+    const ex = await db.query(
+      `SELECT group_id FROM peer_structured_exercises WHERE exercise_id = $1`,
+      [exerciseId]
+    );
+    if (ex.rows.length === 0) throw httpError(404, 'Exercise not found.');
+    if (!(await isActiveGroupMember(userId, ex.rows[0].group_id))) {
+      throw httpError(403, 'You must be a member of this group to respond.');
+    }
+    const { rows } = await db.query(
+      `INSERT INTO peer_exercise_responses (exercise_id, user_id, content)
+       VALUES ($1, $2, $3)
+       RETURNING response_id, exercise_id, user_id, created_at`,
+      [exerciseId, userId, content]
+    );
+    return rows[0];
+  },
+
+  // ── Mentorships (read-only here) ─────────────────────────────────────────────
+
+  /**
+   * The current user's active mentorships (as mentor or mentee). Read-only.
+   * Mentor matching/creation is a separate privacy-gated follow-on (it would read
+   * others' clinical improvement from validated_assessments, which conflicts with
+   * the anonymous peer model — needs an opt-in design).
+   */
+  async getUserMentorships(userId) {
+    const { rows } = await db.query(
+      `SELECT mentorship_id, mentor_id, mentee_id, status, started_at, ended_at,
+              CASE WHEN mentor_id = $1 THEN 'mentor' ELSE 'mentee' END AS role
+         FROM peer_mentorships
+        WHERE (mentor_id = $1 OR mentee_id = $1) AND status = 'active'
+        ORDER BY started_at DESC`,
+      [userId]
+    );
+    return rows;
+  },
+
   // Exposed for tests.
   _classifyPattern: classifyPattern,
   _computeLinearTrendSlope: computeLinearTrendSlope,
   CLUSTER_LABELS,
+  EXERCISE_TYPES,
 };
 
 module.exports = enhancedPeerService;

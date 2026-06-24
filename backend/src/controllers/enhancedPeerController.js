@@ -47,65 +47,54 @@ const suggestGroup = async (req, res, next) => {
 const createExercise = async (req, res, next) => {
   try {
     const { groupId, exerciseType, title, description, scheduledAt } = req.body;
-    const userId = req.user.userId;
-
-    logger.info('Group exercise created', { userId, groupId, exerciseType });
-
-    // TODO: implement with EnhancedPeer model
-    res.status(201).json({
-      success: true,
-      data: { groupId, exerciseType, title, description, scheduledAt }
-    });
+    const exercise = await enhancedPeerService.createStructuredExercise(
+      req.user.userId, groupId, exerciseType, title, description, scheduledAt
+    );
+    res.status(201).json({ success: true, data: exercise });
   } catch (error) {
+    if (error.status) return res.status(error.status).json({ success: false, error: error.message });
     logger.error('Error creating exercise', { error: error.message });
     next(error);
   }
 };
 
 /**
- * Get exercises for a group
+ * Get exercises for a group (members only)
  */
 const getGroupExercises = async (req, res, next) => {
   try {
-    const { groupId: _groupId } = req.params;
-    const _userId = req.user.userId;
-
-    // TODO: implement with EnhancedPeer model
-    res.json({ success: true, data: [] });
+    const exercises = await enhancedPeerService.getGroupExercises(req.user.userId, req.params.groupId);
+    res.json({ success: true, data: exercises });
   } catch (error) {
+    if (error.status) return res.status(error.status).json({ success: false, error: error.message });
     logger.error('Error fetching group exercises', { error: error.message });
     next(error);
   }
 };
 
 /**
- * Submit a response to a group exercise
+ * Submit a response to a group exercise (members only)
  */
 const submitExerciseResponse = async (req, res, next) => {
   try {
-    const { exerciseId } = req.params;
-    const { content } = req.body;
-    const userId = req.user.userId;
-
-    logger.info('Exercise response submitted', { userId, exerciseId });
-
-    // TODO: implement with EnhancedPeer model
-    res.status(201).json({ success: true, data: { exerciseId, content } });
+    const response = await enhancedPeerService.submitExerciseResponse(
+      req.user.userId, req.params.exerciseId, req.body.content
+    );
+    res.status(201).json({ success: true, data: response });
   } catch (error) {
+    if (error.status) return res.status(error.status).json({ success: false, error: error.message });
     logger.error('Error submitting exercise response', { error: error.message });
     next(error);
   }
 };
 
 /**
- * Get mentorship connections for current user
+ * Get mentorship connections for the current user
  */
 const getMentorships = async (req, res, next) => {
   try {
-    const _userId = req.user.userId;
-
-    // TODO: implement with EnhancedPeer model
-    res.json({ success: true, data: [] });
+    const mentorships = await enhancedPeerService.getUserMentorships(req.user.userId);
+    res.json({ success: true, data: mentorships });
   } catch (error) {
     logger.error('Error fetching mentorships', { error: error.message });
     next(error);

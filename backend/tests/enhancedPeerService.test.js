@@ -124,3 +124,91 @@ describe('suggestGroup', () => {
     expect(db.query).toHaveBeenCalledTimes(1); // no second query against peer_support_groups
   });
 });
+
+describe('createStructuredExercise', () => {
+  beforeEach(() => jest.clearAllMocks());
+
+  it('rejects an invalid exercise type before any DB call (400)', async () => {
+    await expect(svc.createStructuredExercise('u1', 'g1', 'not_a_type', 'T')).rejects.toMatchObject({ status: 400 });
+    expect(db.query).not.toHaveBeenCalled();
+  });
+
+  it('rejects a non-member (403) and does not insert', async () => {
+    db.query.mockResolvedValueOnce({ rows: [] }); // membership check: not a member
+    await expect(svc.createStructuredExercise('u1', 'g1', 'gratitude_round', 'T')).rejects.toMatchObject({ status: 403 });
+    expect(db.query).toHaveBeenCalledTimes(1); // only the membership check
+  });
+
+  it('inserts for an active member', async () => {
+    db.query
+      .mockResolvedValueOnce({ rows: [{ '?column?': 1 }] }) // is member
+      .mockResolvedValueOnce({ rows: [{ exercise_id: 'e1', group_id: 'g1', exercise_type: 'gratitude_round', title: 'T' }] });
+    const ex = await svc.createStructuredExercise('u1', 'g1', 'gratitude_round', 'T', 'desc', null);
+    expect(ex.exercise_id).toBe('e1');
+    const memberSql = db.query.mock.calls[0][0];
+    expect(memberSql).toContain('FROM group_members');
+    expect(db.query.mock.calls[1][0]).toContain('INSERT INTO peer_structured_exercises');
+  });
+});
+
+describe('getGroupExercises', () => {
+  beforeEach(() => jest.clearAllMocks());
+
+  it('rejects a non-member (403)', async () => {
+    db.query.mockResolvedValueOnce({ rows: [] });
+    await expect(svc.getGroupExercises('u1', 'g1')).rejects.toMatchObject({ status: 403 });
+  });
+
+  it('lists exercises with a response count for a member', async () => {
+    db.query
+      .mockResolvedValueOnce({ rows: [{ '?column?': 1 }] })
+      .mockResolvedValueOnce({ rows: [{ exercise_id: 'e1', response_count: 3 }] });
+    const list = await svc.getGroupExercises('u1', 'g1');
+    expect(list[0]).toMatchObject({ exercise_id: 'e1', response_count: 3 });
+    expect(db.query.mock.calls[1][0]).toContain('peer_exercise_responses');
+  });
+});
+
+describe('submitExerciseResponse', () => {
+  beforeEach(() => jest.clearAllMocks());
+
+  it('404 when the exercise does not exist', async () => {
+    db.query.mockResolvedValueOnce({ rows: [] }); // exercise lookup
+    await expect(svc.submitExerciseResponse('u1', 'e1', 'hi')).rejects.toMatchObject({ status: 404 });
+  });
+
+  it('403 when the user is not a member of the exercise group', async () => {
+    db.query
+      .mockResolvedValueOnce({ rows: [{ group_id: 'g1' }] }) // exercise -> group
+      .mockResolvedValueOnce({ rows: [] }); // membership: none
+    await expect(svc.submitExerciseResponse('u1', 'e1', 'hi')).rejects.toMatchObject({ status: 403 });
+  });
+
+  it('records a response for a member', async () => {
+    db.query
+      .mockResolvedValueOnce({ rows: [{ group_id: 'g1' }] })
+      .mockResolvedValueOnce({ rows: [{ '?column?': 1 }] })
+      .mockResolvedValueOnce({ rows: [{ response_id: 'r1', exercise_id: 'e1' }] });
+    const r = await svc.submitExerciseResponse('u1', 'e1', 'hi');
+    expect(r.response_id).toBe('r1');
+    expect(db.query.mock.calls[2][0]).toContain('INSERT INTO peer_exercise_responses');
+  });
+});
+
+describe('getUserMentorships', () => {
+  beforeEach(() => jest.clearAllMocks());
+
+  it('returns the user\'s active mentorships with a role', async () => {
+    db.query.mockResolvedValueOnce({
+      rows: [
+        { mentorship_id: 'm1', mentor_id: 'u1', mentee_id: 'u2', status: 'active', role: 'mentor' },
+      ],
+    });
+    const ms = await svc.getUserMentorships('u1');
+    expect(ms[0]).toMatchObject({ mentorship_id: 'm1', role: 'mentor' });
+    const [sql, params] = db.query.mock.calls[0];
+    expect(sql).toContain('FROM peer_mentorships');
+    expect(sql).toContain("status = 'active'");
+    expect(params).toEqual(['u1']);
+  });
+});

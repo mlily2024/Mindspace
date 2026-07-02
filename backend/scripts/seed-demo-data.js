@@ -13,7 +13,8 @@
  * Requirements:
  *   - The backend must be running (npm run dev) — script hits the API
  *     for auth, Luna and insights.
- *   - backend/.env must be configured (DB, JWT_SECRET, ENCRYPTION_KEY).
+ *   - A DB connection (DATABASE_URL, or the DB_* vars locally). The seeder
+ *     itself no longer needs ENCRYPTION_KEY — demo notes are seeded plaintext.
  *
  * Usage:
  *   node backend/scripts/seed-demo-data.js
@@ -23,8 +24,24 @@
 const path = require('path');
 require('dotenv').config({ path: path.resolve(__dirname, '..', '.env') });
 
-const { pool } = require('../src/config/database');
-const { encrypt } = require('../src/utils/encryption');
+const { Pool } = require('pg');
+
+// Self-contained pool so this script runs in CI (the GitHub Actions demo-reset
+// cron) with only DATABASE_URL, and locally with the backend's DB_* vars.
+// Deliberately does NOT require ../src/utils/encryption: that module throws at
+// load when ENCRYPTION_KEY is absent (which it is in CI), and the demo notes
+// are seeded as plaintext (see seedMoodEntries) so no key is needed.
+const pool = new Pool(
+  process.env.DATABASE_URL
+    ? { connectionString: process.env.DATABASE_URL, ssl: { rejectUnauthorized: false } }
+    : {
+        host: process.env.DB_HOST,
+        port: process.env.DB_PORT,
+        database: process.env.DB_NAME,
+        user: process.env.DB_USER,
+        password: process.env.DB_PASSWORD,
+      }
+);
 
 const BASE = process.env.SEED_API_BASE || 'http://localhost:5000/api';
 
@@ -100,7 +117,12 @@ const seedMoodEntries = async (userId) => {
   );
 
   for (const d of SEVEN_DAYS) {
-    const encryptedNotes = encrypt(d.notes);
+    // Demo notes are seeded as PLAINTEXT with is_encrypted = FALSE. This is a
+    // shared public demo account with staged content, not private user data,
+    // and it keeps the seeder key-free so the CI cron can run without the
+    // server's ENCRYPTION_KEY. The read path (MoodEntry model) only decrypts
+    // when is_encrypted is TRUE, so these render verbatim. Real users' notes
+    // are AES-256-GCM encrypted server-side on the normal write path.
     await pool.query(
       `INSERT INTO mood_entries
          (entry_id, user_id, entry_date, entry_time,
@@ -109,11 +131,11 @@ const seedMoodEntries = async (userId) => {
        VALUES (uuid_generate_v4(), $1,
                CURRENT_DATE - ($2::int) * INTERVAL '1 day',
                '20:00:00',
-               $3, $4, $5, $6, $7, $8, $9, $10, $11::jsonb, $12::jsonb, TRUE)`,
+               $3, $4, $5, $6, $7, $8, $9, $10, $11::jsonb, $12::jsonb, FALSE)`,
       [
         userId, d.day,
         d.mood, d.energy, d.stress, d.sleep_q, d.sleep_h, d.anxiety, d.social,
-        encryptedNotes,
+        d.notes,
         JSON.stringify(d.activities), JSON.stringify(d.triggers)
       ]
     );

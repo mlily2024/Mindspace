@@ -186,6 +186,107 @@ function pauseFrequency(samples, sampleRate) {
   return seconds > 0 ? pauses / seconds : 0;
 }
 
+// ─── Formants via LPC (E.1 follow-on, ADR-0026) ──────────────────────────────
+// Estimated from the LPC spectral envelope: fit an all-pole model to the loudest
+// voiced frame, then read its resonance peaks (the minima of |A(e^jω)|). No
+// polynomial root-finding — the envelope is evaluated on a frequency grid and
+// peak-picked, which is simpler and more robust in pure JS.
+
+const FORMANT_MIN_HZ = 90;
+const FORMANT_MAX_HZ = 5000;
+const PREEMPH = 0.97;
+
+/** Autocorrelation of a frame up to `order` lags. */
+function autocorrLags(frame, order) {
+  const r = new Array(order + 1).fill(0);
+  for (let k = 0; k <= order; k += 1) {
+    let s = 0;
+    for (let i = 0; i + k < frame.length; i += 1) s += frame[i] * frame[i + k];
+    r[k] = s;
+  }
+  return r;
+}
+
+/**
+ * Levinson-Durbin recursion → LPC coefficients a[0..p] (a[0]=1) of the
+ * prediction-error filter A(z) = 1 + Σ a[k] z^-k, plus the residual error.
+ */
+function levinsonDurbin(r, order) {
+  const a = new Array(order + 1).fill(0);
+  a[0] = 1;
+  let e = r[0];
+  if (e <= 0) return { a, error: 0 };
+  for (let i = 1; i <= order; i += 1) {
+    let acc = r[i];
+    for (let j = 1; j < i; j += 1) acc += a[j] * r[i - j];
+    const k = -acc / e;
+    const prev = a.slice();
+    a[i] = k;
+    for (let j = 1; j < i; j += 1) a[j] = prev[j] + k * prev[i - j];
+    e *= 1 - k * k;
+    if (e <= 0) break;
+  }
+  return { a, error: e };
+}
+
+/** Resonance peaks of the LPC envelope (minima of |A(e^jω)|), in Hz, ascending. */
+function lpcFormantPeaks(a, sampleRate, { step = 5 } = {}) {
+  const freqs = [];
+  const mag2 = [];
+  for (let f = FORMANT_MIN_HZ; f <= FORMANT_MAX_HZ; f += step) {
+    const w = (2 * Math.PI * f) / sampleRate;
+    let re = 1;
+    let im = 0;
+    for (let k = 1; k < a.length; k += 1) {
+      re += a[k] * Math.cos(k * w);
+      im -= a[k] * Math.sin(k * w);
+    }
+    freqs.push(f);
+    mag2.push(re * re + im * im);
+  }
+  const peaks = [];
+  for (let i = 1; i < mag2.length - 1; i += 1) {
+    if (mag2[i] < mag2[i - 1] && mag2[i] < mag2[i + 1]) peaks.push(freqs[i]);
+  }
+  return peaks;
+}
+
+/** Loudest frame start index for a given frame length, or -1. */
+function loudestFrameStart(samples, frameLen) {
+  let best = -1;
+  let bestE = 0;
+  const hop = Math.max(1, Math.floor(frameLen / 2));
+  for (let start = 0; start + frameLen <= samples.length; start += hop) {
+    let e = 0;
+    for (let j = 0; j < frameLen; j += 1) e += samples[start + j] * samples[start + j];
+    if (e > bestE) { bestE = e; best = start; }
+  }
+  return best;
+}
+
+/**
+ * Estimate the first few formant frequencies (F1, F2, F3) in Hz from the loudest
+ * voiced frame. Returns [] when no stable estimate is available (never fabricates).
+ */
+function estimateFormants(samples, sampleRate, { maxFormants = 3 } = {}) {
+  const frameLen = Math.max(2, Math.floor((FRAME_MS / 1000) * sampleRate));
+  const start = loudestFrameStart(samples, frameLen);
+  if (start < 0) return [];
+  // pre-emphasis (flatten spectral tilt) + Hamming window
+  const frame = new Array(frameLen);
+  for (let i = 0; i < frameLen; i += 1) {
+    const x = samples[start + i] - (i > 0 ? PREEMPH * samples[start + i - 1] : 0);
+    const win = 0.54 - 0.46 * Math.cos((2 * Math.PI * i) / (frameLen - 1));
+    frame[i] = x * win;
+  }
+  const order = Math.min(frameLen - 1, 2 + Math.round(sampleRate / 1000));
+  const r = autocorrLags(frame, order);
+  if (r[0] <= 0) return [];
+  const { a, error } = levinsonDurbin(r, order);
+  if (!(error > 0)) return [];
+  return lpcFormantPeaks(a, sampleRate).slice(0, maxFormants);
+}
+
 /**
  * Extract the full acoustic feature set. Throws (never fabricates) when the audio
  * is unusable, so callers surface an error rather than persisting fake biometrics.
@@ -219,6 +320,7 @@ function extractFeatures(samples, sampleRate, durationSeconds) {
     pauseFrequency: pauseFrequency(samples, sampleRate),
     jitter: jitterLocal(f0s),
     volumeVariability: shimmerLocal(amps),
+    formants: estimateFormants(samples, sampleRate),
     duration: durationSeconds,
   };
 }
@@ -232,6 +334,9 @@ export {
   averageVolume,
   speechRate,
   pauseFrequency,
+  estimateFormants,
+  levinsonDurbin,
+  lpcFormantPeaks,
   PITCH_MIN_HZ,
   PITCH_MAX_HZ,
 };

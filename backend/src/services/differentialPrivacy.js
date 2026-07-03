@@ -96,12 +96,15 @@ class PrivacyBudget {
    * @param {Object} [opts]
    * @param {number} [opts.totalEpsilon=10]  Total ε allowed per scope.
    */
-  constructor({ totalEpsilon = 10 } = {}) {
+  constructor({ totalEpsilon = 10, backend = null } = {}) {
     if (!(totalEpsilon > 0)) {
       throw new Error('PrivacyBudget: totalEpsilon must be > 0');
     }
     this.totalEpsilon = totalEpsilon;
-    this._spent = new Map();   // scope → ε spent
+    this._spent = new Map();   // scope → ε spent (local mirror)
+    // Optional shared backend for multi-instance atomic accounting (F.7, ADR-0025).
+    // null = single-instance in-process budget — the default, unchanged.
+    this._backend = backend;
   }
 
   /** Total ε allowed for any scope. */
@@ -131,6 +134,29 @@ class PrivacyBudget {
     return next;
   }
 
+  /**
+   * Multi-instance-safe consume. With a shared backend configured, the
+   * check-and-increment is atomic ACROSS instances, so N app instances cannot
+   * collectively exceed totalEpsilon and silently weaken the ε-guarantee.
+   * Without a backend it is exactly the in-process `consume`. Async because the
+   * shared backend (Redis) is async; the single-instance path resolves at once.
+   * Throws the same "exhausted" error as `consume`.
+   */
+  async consumeShared(scope, epsilon) {
+    if (!scope)         throw new Error('PrivacyBudget.consumeShared: scope is required');
+    if (!(epsilon > 0)) throw new Error('PrivacyBudget.consumeShared: epsilon must be > 0');
+    if (!this._backend) return this.consume(scope, epsilon);
+    const res = await this._backend.tryConsume(scope, epsilon, this.totalEpsilon);
+    if (!res.ok) {
+      throw new Error(
+        `PrivacyBudget exhausted for scope '${scope}': would spend ` +
+        `${(res.spent + epsilon).toFixed(4)} of ${this.totalEpsilon.toFixed(4)} ε`
+      );
+    }
+    this._spent.set(scope, res.spent); // refresh local mirror for the sync reads
+    return res.spent;
+  }
+
   /** Reset the budget for one scope (admin/testing). */
   reset(scope) { this._spent.delete(scope); }
 
@@ -138,11 +164,57 @@ class PrivacyBudget {
   resetAll() { this._spent.clear(); }
 }
 
+// Atomic check-and-increment: commit the spend only if it stays within total.
+// KEYS[1]=budget key, ARGV[1]=epsilon, ARGV[2]=totalEpsilon → returns {ok, spent}.
+const BUDGET_LUA = `
+local cur = tonumber(redis.call('GET', KEYS[1]) or '0')
+local nxt = cur + tonumber(ARGV[1])
+if nxt > tonumber(ARGV[2]) + 1e-12 then return {0, tostring(cur)} end
+redis.call('SET', KEYS[1], tostring(nxt))
+return {1, tostring(nxt)}
+`;
+
+/**
+ * Shared privacy-budget backend over Redis (F.7 follow-on, ADR-0025). Returns
+ * null when REDIS_URL is unset — the budget stays in-process, so single-instance
+ * deployments are byte-for-byte unchanged and ioredis is never loaded. Enable
+ * multi-instance mode with REDIS_URL AND `npm install ioredis` (intentionally an
+ * undeclared, lazily-required dependency). If the client cannot be created it
+ * degrades safely to single-instance. The client factory is injectable so this
+ * is unit-testable without ioredis or a live server.
+ */
+function createBudgetBackend({ redisUrl = process.env.REDIS_URL, createClient, keyPrefix = 'mindspace:dpbudget:' } = {}) {
+  if (!redisUrl) return null;
+  let client;
+  try {
+    if (createClient) {
+      client = createClient(redisUrl);
+    } else {
+      // eslint-disable-next-line global-require
+      const Redis = require('ioredis');
+      client = new Redis(redisUrl);
+    }
+  } catch (_err) {
+    return null; // degrade safely to single-instance
+  }
+  const key = (scope) => keyPrefix + scope;
+  return {
+    async tryConsume(scope, epsilon, total) {
+      const [ok, spent] = await client.eval(BUDGET_LUA, 1, key(scope), String(epsilon), String(total));
+      return { ok: Number(ok) === 1, spent: Number(spent) };
+    },
+    async getSpent(scope) { return Number((await client.get(key(scope))) || 0); },
+    async reset(scope) { await client.del(key(scope)); },
+    close() { return client.quit ? client.quit() : undefined; },
+  };
+}
+
 module.exports = {
   laplaceSample,
   addLaplaceNoise,
   sensitivity,
   PrivacyBudget,
+  createBudgetBackend,
   // Exported for testing — the uniform sampler is the foundation.
-  _internal: { uniform01 }
+  _internal: { uniform01, BUDGET_LUA }
 };

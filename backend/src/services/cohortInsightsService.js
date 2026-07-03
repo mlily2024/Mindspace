@@ -1,6 +1,6 @@
 const db = require('../config/database');
 const logger = require('../config/logger');
-const { addLaplaceNoise, sensitivity, PrivacyBudget } = require('./differentialPrivacy');
+const { addLaplaceNoise, sensitivity, PrivacyBudget, createBudgetBackend } = require('./differentialPrivacy');
 
 /**
  * cohortInsightsService — privacy-preserving aggregate statistics
@@ -29,7 +29,8 @@ const DEFAULT_MIN_N = 5;
 // otherwise an attacker can wash out the budget by reconnecting.
 // Persisted on process restart; this is a known limitation and is
 // documented in ADR-0005.
-const _budget = new PrivacyBudget({ totalEpsilon: DEFAULT_TOTAL_EPSILON });
+// backend is null unless REDIS_URL is set → single-instance behaviour unchanged.
+const _budget = new PrivacyBudget({ totalEpsilon: DEFAULT_TOTAL_EPSILON, backend: createBudgetBackend() });
 
 /**
  * Average mood by day-of-week, with ε-Laplace noise per group.
@@ -49,7 +50,7 @@ const getAverageMoodByDayOfWeek = async ({
 
   // Reserve budget BEFORE the query. If consume throws, no data is read
   // (avoids leaking dataset state through timing-of-failure).
-  _budget.consume(SCOPE, epsilon);
+  await _budget.consumeShared(SCOPE, epsilon);
 
   const r = await db.query(`
     SELECT EXTRACT(DOW FROM entry_date)::int AS dow,

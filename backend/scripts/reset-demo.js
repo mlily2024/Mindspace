@@ -86,6 +86,45 @@ function runSeedScript() {
   });
 }
 
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const backoffMs = (n) => Math.min(15000, 2000 * n); // 2s, 4s, ... capped at 15s
+
+// The free-tier Render API (mindspace-demo-api) sleeps after ~15 min idle, so the
+// 03:00 UTC cron always hits it cold and gets a 503 on the first request. Poll
+// /health until it wakes BEFORE any destructive wipe, honouring the Retry-After
+// header Render sends while spinning up. /health lives at the origin root, not
+// under /api, so strip a trailing /api from the base.
+function apiOrigin() {
+  const base = process.env.API_BASE_URL || process.env.API_BASE || '';
+  return base.replace(/\/api\/?$/, '');
+}
+
+async function waitForApi(budgetMs) {
+  const healthUrl = `${apiOrigin()}/health`;
+  const start = Date.now();
+  console.log(`Waking demo API: ${healthUrl} (up to ${Math.round(budgetMs / 1000)}s)`);
+  let attempt = 0;
+  while (Date.now() - start < budgetMs) {
+    attempt += 1;
+    try {
+      const res = await fetch(healthUrl, { method: 'GET' });
+      if (res.status >= 200 && res.status < 300) {
+        console.log(`  [ok] API is up (attempt ${attempt}, ${Math.round((Date.now() - start) / 1000)}s)`);
+        return true;
+      }
+      const ra = Number(res.headers.get('retry-after'));
+      const waitMs = Number.isFinite(ra) && ra > 0 ? ra * 1000 : backoffMs(attempt);
+      console.log(`  attempt ${attempt}: HTTP ${res.status}; retrying in ${Math.round(waitMs / 1000)}s`);
+      await sleep(waitMs);
+    } catch (err) {
+      const waitMs = backoffMs(attempt);
+      console.log(`  attempt ${attempt}: ${err.code || err.message}; retrying in ${Math.round(waitMs / 1000)}s`);
+      await sleep(waitMs);
+    }
+  }
+  return false;
+}
+
 async function main() {
   if (!process.env.DATABASE_URL) {
     console.error('DATABASE_URL is not set. Refusing to run.');
@@ -93,6 +132,18 @@ async function main() {
   }
   if (!process.env.API_BASE_URL && !process.env.API_BASE) {
     console.error('API_BASE_URL is not set. Refusing to run (seed needs the API).');
+    process.exit(1);
+  }
+
+  // Wake the free-tier API before wiping anything. If it never comes up within
+  // the budget, exit WITHOUT wiping so a bad night leaves the demo stale rather
+  // than emptied-but-not-reseeded.
+  const warmupMs = Number(process.env.DEMO_WARMUP_TIMEOUT_MS || 180000);
+  if (!(await waitForApi(warmupMs))) {
+    console.error(
+      `Demo API did not become reachable within ${Math.round(warmupMs / 1000)}s. ` +
+      'Skipping wipe to preserve existing demo data.'
+    );
     process.exit(1);
   }
 

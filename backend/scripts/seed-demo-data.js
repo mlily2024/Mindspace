@@ -92,11 +92,30 @@ const postJson = async (urlPath, body, token) => {
   return { status: res.status, data };
 };
 
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
 // ─── Stage 1: register or log in the demo user ───────────────────────────────
 const getOrCreateUser = async () => {
-  const login = await postJson('/auth/login', { email: DEMO.email, password: DEMO.password });
-  if (login.status === 200 && login.data && login.data.data && login.data.data.token) {
-    return { userId: login.data.data.user.userId, token: login.data.data.token, isNew: false };
+  // Belt-and-braces retry to ride out any residual free-tier cold-start 5xx
+  // (reset-demo.js already warms the API via /health before spawning us).
+  let login = null;
+  for (let attempt = 1; attempt <= 5; attempt += 1) {
+    try {
+      login = await postJson('/auth/login', { email: DEMO.email, password: DEMO.password });
+    } catch (err) {
+      console.warn(`  login attempt ${attempt}: network error (${err.message}); retrying...`);
+      await sleep(3000 * attempt);
+      continue;
+    }
+    if (login.status === 200 && login.data && login.data.data && login.data.data.token) {
+      return { userId: login.data.data.user.userId, token: login.data.data.token, isNew: false };
+    }
+    if (login.status >= 500) {
+      console.warn(`  login attempt ${attempt}: HTTP ${login.status}; retrying...`);
+      await sleep(3000 * attempt);
+      continue;
+    }
+    break; // 4xx (e.g. demo user does not exist yet) → fall through to register
   }
   const reg = await postJson('/auth/register', DEMO);
   if (reg.status >= 200 && reg.status < 300 && reg.data && reg.data.data && reg.data.data.token) {

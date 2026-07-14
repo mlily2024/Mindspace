@@ -88,6 +88,9 @@ function runSeedScript() {
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const backoffMs = (n) => Math.min(15000, 2000 * n); // 2s, 4s, ... capped at 15s
+const ATTEMPT_TIMEOUT_MS = 20000; // per-poll cap: a cold Render connection can
+                                  // otherwise hang ~5 min (undici's default header
+                                  // timeout) and eat the whole warm-up budget.
 
 // The free-tier Render API (mindspace-demo-api) sleeps after ~15 min idle, so the
 // 03:00 UTC cron always hits it cold and gets a 503 on the first request. Poll
@@ -107,7 +110,7 @@ async function waitForApi(budgetMs) {
   while (Date.now() - start < budgetMs) {
     attempt += 1;
     try {
-      const res = await fetch(healthUrl, { method: 'GET' });
+      const res = await fetch(healthUrl, { method: 'GET', signal: AbortSignal.timeout(ATTEMPT_TIMEOUT_MS) });
       if (res.status >= 200 && res.status < 300) {
         console.log(`  [ok] API is up (attempt ${attempt}, ${Math.round((Date.now() - start) / 1000)}s)`);
         return true;
@@ -138,7 +141,7 @@ async function main() {
   // Wake the free-tier API before wiping anything. If it never comes up within
   // the budget, exit WITHOUT wiping so a bad night leaves the demo stale rather
   // than emptied-but-not-reseeded.
-  const warmupMs = Number(process.env.DEMO_WARMUP_TIMEOUT_MS || 180000);
+  const warmupMs = Number(process.env.DEMO_WARMUP_TIMEOUT_MS || 240000);
   if (!(await waitForApi(warmupMs))) {
     console.error(
       `Demo API did not become reachable within ${Math.round(warmupMs / 1000)}s. ` +

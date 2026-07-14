@@ -85,7 +85,8 @@ const postJson = async (urlPath, body, token) => {
   const headers = { 'Content-Type': 'application/json' };
   if (token) headers.Authorization = `Bearer ${token}`;
   const res = await fetch(`${BASE}${urlPath}`, {
-    method: 'POST', headers, body: JSON.stringify(body)
+    method: 'POST', headers, body: JSON.stringify(body),
+    signal: AbortSignal.timeout(30000)
   });
   let data = null;
   try { data = await res.json(); } catch (_) { /* response had no JSON body */ }

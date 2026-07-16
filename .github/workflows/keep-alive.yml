@@ -1,0 +1,32 @@
+name: Keep demo API awake
+
+# Pings the Render free-tier demo API roughly every 10 minutes so it does not
+# spin down after ~15 minutes of inactivity. This spares first-time visitors
+# the ~30-60s cold-start wake. Free on public repos (GitHub Actions minutes are
+# unlimited for public repositories). The Neon database is already always-on;
+# this only keeps the web service warm.
+#
+# Deliberately does NOT fail on a non-200: a single slow cold start or transient
+# blip should not send failure emails. Its only job is to send traffic.
+
+on:
+  schedule:
+    - cron: "*/10 * * * *"
+  workflow_dispatch:
+
+jobs:
+  ping:
+    name: Ping /health
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Ping the demo API health endpoint
+        run: |
+          code=$(curl -s -o /dev/null -m 90 -w "%{http_code}" \
+            https://mindspace-demo-api.onrender.com/health || echo "000")
+          echo "health: HTTP $code"
+          if [ "$code" = "200" ]; then
+            echo "API is awake."
+          else
+            echo "::notice::Non-200 ($code) — the API may have been cold-starting; this run does not fail."
+          fi

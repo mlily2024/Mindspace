@@ -56,13 +56,15 @@ services:
     # after the first deploy. See blueprint header comment.
     envVars:
       - key: NODE_ENV
-        # `staging` rather than `production` so the global error handler
-        # returns the real error message + stack in HTTP responses. This
-        # is a public demo, not a real production environment — the
-        # production-error-hiding hardening doesn't matter and makes
-        # debugging deploy-time issues much harder. Flip back to
-        # `production` if/when the demo is ever made user-facing.
-        value: staging
+        # `production` so the global error handler hides internal error
+        # messages and stack traces from HTTP responses (see
+        # src/middleware/errorHandler.js). Was `staging` during demo bring-up
+        # to surface deploy-time errors; flipped to production for launch
+        # readiness. NOTE: production also disables the mock wearable providers
+        # (src/services/mockWearableProviders.js shouldUseMock), so the
+        # wearables page shows no data until real integrations exist. That is
+        # intentional: fabricated biometrics must not be shown to real users.
+        value: production
       - key: PORT
         value: 5000
       # Free tier blocks both `preDeployCommand` AND Shell access. To still

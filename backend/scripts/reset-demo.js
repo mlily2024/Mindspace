@@ -88,9 +88,22 @@ function runSeedScript() {
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const backoffMs = (n) => Math.min(15000, 2000 * n); // 2s, 4s, ... capped at 15s
-const ATTEMPT_TIMEOUT_MS = 20000; // per-poll cap: a cold Render connection can
-                                  // otherwise hang ~5 min (undici's default header
-                                  // timeout) and eat the whole warm-up budget.
+const ATTEMPT_TIMEOUT_MS = Number(process.env.DEMO_POLL_TIMEOUT_MS || 15000);
+
+// Bounded health poll. A cold Render connection can hang in the connect phase
+// far longer than undici honours AbortSignal for (run #19: a single hung poll
+// ate the whole budget despite AbortSignal.timeout), so we also race the fetch
+// against a wall-clock timer that is guaranteed to fire. That lets the warm-up
+// loop keep retrying through the ~60-90s cold start instead of stalling on one
+// request. Any abandoned socket is torn down when the process exits.
+async function fetchHealth(url) {
+  return Promise.race([
+    fetch(url, { method: 'GET', signal: AbortSignal.timeout(ATTEMPT_TIMEOUT_MS) }),
+    sleep(ATTEMPT_TIMEOUT_MS + 2000).then(() => {
+      throw new Error(`no response within ${Math.round(ATTEMPT_TIMEOUT_MS / 1000)}s`);
+    }),
+  ]);
+}
 
 // The free-tier Render API (mindspace-demo-api) sleeps after ~15 min idle, so the
 // 03:00 UTC cron always hits it cold and gets a 503 on the first request. Poll
@@ -110,7 +123,7 @@ async function waitForApi(budgetMs) {
   while (Date.now() - start < budgetMs) {
     attempt += 1;
     try {
-      const res = await fetch(healthUrl, { method: 'GET', signal: AbortSignal.timeout(ATTEMPT_TIMEOUT_MS) });
+      const res = await fetchHealth(healthUrl);
       if (res.status >= 200 && res.status < 300) {
         console.log(`  [ok] API is up (attempt ${attempt}, ${Math.round((Date.now() - start) / 1000)}s)`);
         return true;
@@ -121,7 +134,7 @@ async function waitForApi(budgetMs) {
       await sleep(waitMs);
     } catch (err) {
       const waitMs = backoffMs(attempt);
-      console.log(`  attempt ${attempt}: ${err.code || err.message}; retrying in ${Math.round(waitMs / 1000)}s`);
+      console.log(`  attempt ${attempt}: ${err.message || err.code || err.name}; retrying in ${Math.round(waitMs / 1000)}s`);
       await sleep(waitMs);
     }
   }

@@ -45,7 +45,7 @@ api.interceptors.response.use(
 
     if (error.response?.status === 401 && !originalRequest._retry) {
       // Skip refresh for login/register/refresh endpoints
-      const skipUrls = ['/auth/login', '/auth/register', '/auth/refresh'];
+      const skipUrls = ['/auth/login', '/auth/register', '/auth/refresh', '/auth/forgot-password', '/auth/reset-password'];
       if (skipUrls.some(url => originalRequest.url?.includes(url))) {
         return Promise.reject(error.response?.data || { message: error.message });
       }
@@ -108,6 +108,9 @@ export const authAPI = {
   // password and re-validates the new one against the same length floor +
   // blocklist used at registration. Server responds 401 for wrong current,
   // 400 for weak/common/same-as-current, 200 with { success: true } on ok.
+  forgotPassword: (email) => api.post('/auth/forgot-password', { email }),
+  resetPassword: ({ token, newPassword }) =>
+    api.post('/auth/reset-password', { token, newPassword }),
   changePassword: ({ currentPassword, newPassword }) =>
     api.put('/auth/password', { currentPassword, newPassword }),
   updatePreferences: (preferences) => api.put('/auth/preferences', preferences),

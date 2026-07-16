@@ -20,6 +20,8 @@ const Settings = lazy(() => import('./pages/Settings'));
 const CrisisResources = lazy(() => import('./pages/CrisisResources'));
 const PrivacyPolicy = lazy(() => import('./pages/PrivacyPolicy'));
 const TermsOfService = lazy(() => import('./pages/TermsOfService'));
+const ForgotPassword = lazy(() => import('./pages/ForgotPassword'));
+const ResetPassword = lazy(() => import('./pages/ResetPassword'));
 const Journal = lazy(() => import('./pages/Journal'));
 const JournalHistory = lazy(() => import('./pages/JournalHistory'));
 const PeerSupport = lazy(() => import('./pages/PeerSupport'));
@@ -105,6 +107,12 @@ const AppContent = () => {
           } />
           <Route path="/terms" element={
             <ErrorBoundary fallback={RouteErrorFallback}><TermsOfService /></ErrorBoundary>
+          } />
+          <Route path="/forgot-password" element={
+            <ErrorBoundary fallback={RouteErrorFallback}><ForgotPassword /></ErrorBoundary>
+          } />
+          <Route path="/reset-password" element={
+            <ErrorBoundary fallback={RouteErrorFallback}><ResetPassword /></ErrorBoundary>
           } />
           <Route path="/admin" element={
             <ErrorBoundary fallback={RouteErrorFallback}><AdminLogin /></ErrorBoundary>

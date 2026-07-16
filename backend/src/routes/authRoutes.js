@@ -34,6 +34,24 @@ router.post('/register', registerValidation, validate, authController.register);
 router.post('/login', loginValidation, validate, authController.login);
 router.post('/refresh', authController.refreshToken);
 
+// Public password-reset flow (launch blockers #3 + #4)
+const forgotPasswordValidation = [
+  body('email').isEmail().withMessage('Valid email required')
+];
+const resetPasswordValidation = [
+  body('token').isString().isLength({ min: 20 }).withMessage('A valid reset token is required'),
+  body('newPassword')
+    .isLength({ min: 8 }).withMessage('New password must be at least 8 characters')
+    .custom((value) => {
+      if (isCommonPassword(value)) {
+        throw new Error('This password is too common. Please choose a stronger one.');
+      }
+      return true;
+    })
+];
+router.post('/forgot-password', forgotPasswordValidation, validate, authController.forgotPassword);
+router.post('/reset-password', resetPasswordValidation, validate, authController.resetPassword);
+
 // 2026-06-18: in-app password change. Same length + blocklist validation
 // as registration (matches NIST 800-63B alignment shipped in commit
 // 8f86826). Current-password verification happens in the controller.

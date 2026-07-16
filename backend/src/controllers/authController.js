@@ -1,7 +1,17 @@
 const jwt = require('jsonwebtoken');
+const crypto = require('crypto');
 const User = require('../models/User');
+const PasswordResetToken = require('../models/PasswordResetToken');
 const DataExportService = require('../services/dataExportService');
+const emailService = require('../services/emailService');
 const logger = require('../config/logger');
+
+const RESET_TOKEN_TTL_MS = 60 * 60 * 1000; // 1 hour
+const hashResetToken = (raw) => crypto.createHash('sha256').update(String(raw)).digest('hex');
+const resetLinkBase = () =>
+  (process.env.FRONTEND_URL
+    || (process.env.ALLOWED_ORIGINS || '').split(',')[0]
+    || 'http://localhost:5173').replace(/\/$/, '');
 
 /**
  * Generate JWT token
@@ -309,6 +319,73 @@ const permanentDeleteAccount = async (req, res, next) => {
  * Generic error message on current-password failure to avoid leaking
  * whether a user ID exists or has any particular hash.
  */
+/**
+ * Forgot password — start a reset. Always returns 200 with a generic message
+ * (anti-enumeration): the response is identical whether or not the email is
+ * registered. If it is, a single-use, 1-hour token (stored only as a SHA-256
+ * hash) is created and a reset link is emailed. Email delivery degrades
+ * gracefully (logs the link) if SMTP is not configured.
+ */
+const forgotPassword = async (req, res, next) => {
+  const generic = {
+    success: true,
+    message: 'If an account exists for that email, a password reset link has been sent.',
+  };
+  try {
+    const { email } = req.body;
+    const user = await User.findByEmail(email);
+    if (!user || !user.email) {
+      return res.json(generic);
+    }
+
+    await PasswordResetToken.deleteForUser(user.user_id); // invalidate prior links
+    const rawToken = crypto.randomBytes(32).toString('hex');
+    const expiresAt = new Date(Date.now() + RESET_TOKEN_TTL_MS);
+    await PasswordResetToken.create(user.user_id, hashResetToken(rawToken), expiresAt);
+
+    const resetUrl = `${resetLinkBase()}/reset-password?token=${rawToken}`;
+    await emailService.sendPasswordResetEmail(user.email, resetUrl);
+
+    logger.info('Password reset requested', { userId: user.user_id });
+    return res.json(generic);
+  } catch (error) {
+    logger.error('Forgot-password error', { error: error.message });
+    // Still return the generic message so failures don't reveal account state.
+    return res.json(generic);
+  }
+};
+
+/**
+ * Reset password — complete a reset with a token from the emailed link.
+ * The token is looked up by hash, must be unused and unexpired, and is
+ * consumed on success. New-password shape is validated by the route chain.
+ */
+const resetPassword = async (req, res, next) => {
+  try {
+    const { token, newPassword } = req.body;
+    const record = await PasswordResetToken.findValidByHash(hashResetToken(token));
+    if (!record) {
+      return res.status(400).json({
+        success: false,
+        message: 'This reset link is invalid or has expired. Please request a new one.',
+      });
+    }
+
+    await User.updatePassword(record.user_id, newPassword);
+    await PasswordResetToken.markUsed(record.id);
+    await PasswordResetToken.deleteForUser(record.user_id); // clear any remaining links
+
+    logger.info('Password reset completed', { userId: record.user_id });
+    return res.json({
+      success: true,
+      message: 'Your password has been reset. You can now sign in with your new password.',
+    });
+  } catch (error) {
+    logger.error('Reset-password error', { error: error.message });
+    next(error);
+  }
+};
+
 const changePassword = async (req, res, next) => {
   try {
     const { currentPassword, newPassword } = req.body;
@@ -397,6 +474,8 @@ const refreshToken = async (req, res, next) => {
 module.exports = {
   register,
   login,
+  forgotPassword,
+  resetPassword,
   changePassword,
   refreshToken,
   getProfile,

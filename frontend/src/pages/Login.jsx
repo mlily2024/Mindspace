@@ -225,8 +225,8 @@ const Login = () => {
           </Link>
         </div>
 
-        {/* Back to Home */}
-        <div style={{ textAlign: 'center', marginTop: 'var(--spacing-lg)' }}>
+        {/* Back to Home + Privacy */}
+        <div style={{ textAlign: 'center', marginTop: 'var(--spacing-lg)', display: 'flex', gap: 'var(--spacing-md)', justifyContent: 'center' }}>
           <Link
             to="/"
             style={{
@@ -236,6 +236,26 @@ const Login = () => {
             }}
           >
             ← Back to Home
+          </Link>
+          <Link
+            to="/privacy"
+            style={{
+              color: 'var(--text-secondary)',
+              textDecoration: 'none',
+              fontSize: 'var(--font-size-small)'
+            }}
+          >
+            Privacy Policy
+          </Link>
+          <Link
+            to="/terms"
+            style={{
+              color: 'var(--text-secondary)',
+              textDecoration: 'none',
+              fontSize: 'var(--font-size-small)'
+            }}
+          >
+            Terms
           </Link>
         </div>
       </div>

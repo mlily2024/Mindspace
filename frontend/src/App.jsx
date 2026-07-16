@@ -18,6 +18,8 @@ const Insights = lazy(() => import('./pages/Insights'));
 const Recommendations = lazy(() => import('./pages/Recommendations'));
 const Settings = lazy(() => import('./pages/Settings'));
 const CrisisResources = lazy(() => import('./pages/CrisisResources'));
+const PrivacyPolicy = lazy(() => import('./pages/PrivacyPolicy'));
+const TermsOfService = lazy(() => import('./pages/TermsOfService'));
 const Journal = lazy(() => import('./pages/Journal'));
 const JournalHistory = lazy(() => import('./pages/JournalHistory'));
 const PeerSupport = lazy(() => import('./pages/PeerSupport'));
@@ -97,6 +99,12 @@ const AppContent = () => {
           <Route path="/register" element={<Register />} />
           <Route path="/crisis-resources" element={
             <ErrorBoundary fallback={RouteErrorFallback}><CrisisResources /></ErrorBoundary>
+          } />
+          <Route path="/privacy" element={
+            <ErrorBoundary fallback={RouteErrorFallback}><PrivacyPolicy /></ErrorBoundary>
+          } />
+          <Route path="/terms" element={
+            <ErrorBoundary fallback={RouteErrorFallback}><TermsOfService /></ErrorBoundary>
           } />
           <Route path="/admin" element={
             <ErrorBoundary fallback={RouteErrorFallback}><AdminLogin /></ErrorBoundary>

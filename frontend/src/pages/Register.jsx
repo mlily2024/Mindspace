@@ -377,6 +377,19 @@ const Register = () => {
             <span role="img" aria-hidden="true">🔒</span>{' '}
             Your data is encrypted and private. We never share your personal information.
           </p>
+          <p style={{
+            margin: 'var(--spacing-sm) 0 0',
+            fontSize: 'var(--font-size-small)',
+            color: 'var(--text-secondary)'
+          }}>
+            By creating an account you agree to our{' '}
+            <Link to="/terms" style={{ color: 'var(--primary-color)', fontWeight: 600 }}>
+              Terms of Service
+            </Link>{' '}and{' '}
+            <Link to="/privacy" style={{ color: 'var(--primary-color)', fontWeight: 600 }}>
+              Privacy Policy
+            </Link>.
+          </p>
         </div>
       </div>
     </div>

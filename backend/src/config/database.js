@@ -43,13 +43,22 @@ const getSSLConfig = () => {
   return sslConfig;
 };
 
-// PostgreSQL connection pool
+// PostgreSQL connection pool.
+// Prefer a single DATABASE_URL when present — managed hosts such as Neon and
+// Render provide one — and fall back to the split DB_* variables used for
+// local development. This matches the scripts (bootstrap/reset/seed), which
+// already connect via DATABASE_URL.
+const poolConfig = process.env.DATABASE_URL
+  ? { connectionString: process.env.DATABASE_URL }
+  : {
+      host: process.env.DB_HOST,
+      port: process.env.DB_PORT,
+      database: process.env.DB_NAME,
+      user: process.env.DB_USER,
+      password: process.env.DB_PASSWORD
+    };
 const pool = new Pool({
-  host: process.env.DB_HOST,
-  port: process.env.DB_PORT,
-  database: process.env.DB_NAME,
-  user: process.env.DB_USER,
-  password: process.env.DB_PASSWORD,
+  ...poolConfig,
   max: 20,
   idleTimeoutMillis: 30000,
   connectionTimeoutMillis: 2000,

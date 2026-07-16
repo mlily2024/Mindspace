@@ -34,11 +34,10 @@
 #   email:    demo@mindspace.local
 #   password: DemoMindspace!2026
 
-databases:
-  - name: mindspace-demo-db
-    plan: free
-    region: oregon
-    postgresMajorVersion: 16
+# The demo database is hosted on Neon (free and durable — no 30-day expiry like
+# Render's free Postgres, which is what took the demo down in July 2026). Set
+# DATABASE_URL on the backend service (below) to the Neon pooled connection
+# string. No Render-managed database is provisioned by this Blueprint.
 
 services:
   # ---------------------------------------------------------------------
@@ -79,33 +78,16 @@ services:
       # code deploys don't keep wiping demo data. The wipe support stays
       # in bootstrap-render-db.sh and can be re-enabled by adding the
       # env var back, if ever needed.
-      # Database connection — Render injects DATABASE_URL automatically
-      # when the service is linked to a managed Postgres. The backend code
-      # also accepts the split DB_* variables; both forms work.
+      # Database connection — the demo DB is hosted on Neon. Paste the Neon
+      # pooled connection string into DATABASE_URL in the Render dashboard
+      # (kept out of source control via `sync: false`). The backend pool and
+      # every script (bootstrap/reset/seed) read DATABASE_URL directly.
       - key: DATABASE_URL
-        fromDatabase:
-          name: mindspace-demo-db
-          property: connectionString
-      - key: DB_HOST
-        fromDatabase:
-          name: mindspace-demo-db
-          property: host
-      - key: DB_PORT
-        fromDatabase:
-          name: mindspace-demo-db
-          property: port
-      - key: DB_NAME
-        fromDatabase:
-          name: mindspace-demo-db
-          property: database
-      - key: DB_USER
-        fromDatabase:
-          name: mindspace-demo-db
-          property: user
-      - key: DB_PASSWORD
-        fromDatabase:
-          name: mindspace-demo-db
-          property: password
+        sync: false
+      # Neon requires TLS. NODE_ENV is `staging` here (not production), so the
+      # pool's SSL is off by default; DB_SSL=true turns it on for Neon.
+      - key: DB_SSL
+        value: "true"
       # Secrets — Render generates random values on first deploy.
       # The demo doesn't share secrets with the local dev environment.
       - key: JWT_SECRET

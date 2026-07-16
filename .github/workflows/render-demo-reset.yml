@@ -11,10 +11,11 @@ name: Render demo nightly reset
 #
 # Required repository secrets (set in repo → Settings → Secrets & variables
 # → Actions → Repository secrets):
-#   RENDER_DATABASE_URL   — Postgres connection string of the Render demo
-#                           database (Render dashboard → mindspace-demo-db →
-#                           Connection → "External Database URL"). Includes
-#                           the SSL=require flag; reset-demo.js handles SSL.
+#   RENDER_DATABASE_URL   — Postgres connection string of the demo database,
+#                           now hosted on Neon (Neon console → your project →
+#                           Connection Details → "Pooled connection" string,
+#                           which includes ?sslmode=require). reset-demo.js
+#                           connects over SSL. (Name kept for compatibility.)
 #   RENDER_API_BASE       — Public API URL of the Render demo backend,
 #                           e.g. https://mindspace-demo-api.onrender.com/api
 #                           (note the trailing /api).
